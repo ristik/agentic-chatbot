@@ -1,0 +1,12 @@
+{
+  "name": "agentic-chatbot",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "db:migrate": "pnpm --filter agent-server db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
