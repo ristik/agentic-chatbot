@@ -26,6 +26,15 @@ services:
     environment:
       PORT: 3001
 
+  mcp-web:
+    build:
+      context: .
+      dockerfile: packages/mcp-web/Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+
   agent-server:
     build:
       context: .
@@ -36,13 +45,17 @@ services:
       PORT: 3000
       DATABASE_URL: postgres://agentic:agentic_secret@postgres:5432/agentic
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      AMA_API_KEY:    ${AMA_API_KEY}
       MCP_TRIVIA_URL: http://mcp-trivia:3001/mcp
+      MCP_WEB_URL: http://mcp-web:3002/mcp
       CORS_ORIGIN: http://localhost:5173
       DEBUG_PROMPTS: ${DEBUG_PROMPTS:-false}
     depends_on:
       postgres:
         condition: service_healthy
       mcp-trivia:
+        condition: service_started
+      mcp-web:
         condition: service_started
 
   ui:

@@ -20,15 +20,20 @@ export class McpManager {
     async connect(configs: McpServerConfig[]): Promise<void> {
         for (const config of configs) {
             // If already connected, skip
-            if (this.connections.has(config.name)) continue;
+            if (this.connections.has(config.name)) {
+                console.log(`[MCP] Already connected to ${config.name}, reusing connection`);
+                continue;
+            }
 
             // If currently connecting, wait for it
             if (this.connecting.has(config.name)) {
+                console.log(`[MCP] Connection to ${config.name} in progress, waiting...`);
                 await this.connecting.get(config.name);
                 continue;
             }
 
             // Start new connection
+            console.log(`[MCP] Initiating connection to ${config.name}...`);
             const connectPromise = this.connectSingle(config);
             this.connecting.set(config.name, connectPromise);
 
@@ -41,12 +46,17 @@ export class McpManager {
     }
 
     private async connectSingle(config: McpServerConfig): Promise<void> {
-        const client = new Client({ name: 'agent-server', version: '1.0.0' });
-        const transport = new StreamableHTTPClientTransport(new URL(config.url));
+        try {
+            const client = new Client({ name: 'agent-server', version: '1.0.0' });
+            const transport = new StreamableHTTPClientTransport(new URL(config.url));
 
-        await client.connect(transport);
-        this.connections.set(config.name, { client, config });
-        console.log(`Connected to MCP server: ${config.name}`);
+            await client.connect(transport);
+            this.connections.set(config.name, { client, config });
+            console.log(`[MCP] Connected to server: ${config.name}`);
+        } catch (error) {
+            console.error(`[MCP] Failed to connect to ${config.name}:`, error instanceof Error ? error.message : error);
+            throw error;
+        }
     }
 
     async getTools(context?: ToolContext): Promise<Record<string, CoreTool>> {
@@ -133,5 +143,5 @@ export class McpManager {
     }
 }
 
-// Global singleton instance
+// Global singleton instance - connections are reused across requests
 export const globalMcpManager = new McpManager();

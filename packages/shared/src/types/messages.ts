@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const MessageContentSchema = z.discriminatedUnion('type', [
     z.object({ type: z.literal('text'), text: z.string() }),
+    z.object({ type: z.literal('thinking'), text: z.string() }),
     z.object({ type: z.literal('image'), url: z.string(), alt: z.string().optional() }),
     z.object({
         type: z.literal('choice'),

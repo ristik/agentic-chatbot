@@ -7,12 +7,15 @@ interface ChatState {
     messagesByActivity: Record<string, ChatMessage[]>;
     currentActivityId: string | null;
     isStreaming: boolean;
+    currentStatus: string | null; // e.g., "Thinking...", "Using web_fetch tool..."
 
     // Actions
     setActivity: (activityId: string) => void;
     addMessage: (message: ChatMessage) => void;
     appendToLastMessage: (text: string) => void;
+    appendThinkingToLastMessage: (text: string) => void;
     setStreaming: (streaming: boolean) => void;
+    setStatus: (status: string | null) => void;
     clearActivity: (activityId: string) => void;
 
     // Getters
@@ -25,6 +28,7 @@ export const useChatStore = create<ChatState>()(
             messagesByActivity: {},
             currentActivityId: null,
             isStreaming: false,
+            currentStatus: null,
 
             setActivity: (activityId) => set({ currentActivityId: activityId }),
 
@@ -63,7 +67,36 @@ export const useChatStore = create<ChatState>()(
                 };
             }),
 
+            appendThinkingToLastMessage: (text) => set((state) => {
+                const activityId = state.currentActivityId;
+                if (!activityId) return state;
+
+                const messages = [...(state.messagesByActivity[activityId] || [])];
+                const lastMsg = messages[messages.length - 1];
+
+                if (lastMsg && lastMsg.role === 'assistant') {
+                    // Find or create thinking content
+                    let thinkingContent = lastMsg.content.find(c => c.type === 'thinking');
+                    if (!thinkingContent) {
+                        thinkingContent = { type: 'thinking', text: '' };
+                        lastMsg.content.unshift(thinkingContent); // Add thinking before text
+                    }
+                    if (thinkingContent.type === 'thinking') {
+                        thinkingContent.text += text;
+                    }
+                }
+
+                return {
+                    messagesByActivity: {
+                        ...state.messagesByActivity,
+                        [activityId]: messages,
+                    },
+                };
+            }),
+
             setStreaming: (streaming) => set({ isStreaming: streaming }),
+
+            setStatus: (status) => set({ currentStatus: status }),
 
             clearActivity: (activityId) => set((state) => ({
                 messagesByActivity: {

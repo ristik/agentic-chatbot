@@ -114,7 +114,7 @@ export async function* runAgentStream(ctx: AgentContext) {
             localTools.memory = createMemoryTool(toolContext);
         }
 
-        // Connect to MCP servers and get their tools (reuses existing connections)
+        // Connect to MCP servers (reuses existing connections)
         await globalMcpManager.connect(activity.mcpServers);
         const mcpTools = await globalMcpManager.getTools({ userId });
         console.log('[Agent] Tools loaded:', Object.keys({ ...localTools, ...mcpTools }));
@@ -187,6 +187,7 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
 
         console.log('[Agent] Starting text stream...');
         let charCount = 0;
+        let reasoningText = '';
 
         // Stream the response - use fullStream to get all events
         try {
@@ -196,8 +197,14 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
                 if (part.type === 'text-delta') {
                     charCount += part.textDelta.length;
                     yield { type: 'text-delta', text: part.textDelta };
+                } else if (part.type === 'reasoning') {
+                    // Extended thinking models emit reasoning content
+                    console.log('[Agent] Reasoning delta:', part.textDelta?.substring(0, 50));
+                    reasoningText += part.textDelta;
+                    yield { type: 'reasoning', text: part.textDelta };
                 } else if (part.type === 'tool-call') {
                     console.log('[Agent] Tool call:', part.toolName, 'with args:', JSON.stringify(part.args).substring(0, 100));
+                    yield { type: 'tool-call', toolName: part.toolName };
                 } else if (part.type === 'tool-result') {
                     console.log('[Agent] Tool result for:', part.toolName);
 
@@ -219,6 +226,9 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
                     yield { type: 'text-delta', text: `\n\n${errorMsg}\n\n` };
                 } else if (part.type === 'finish') {
                     console.log('[Agent] Finish reason:', part.finishReason);
+                    if (reasoningText) {
+                        console.log('[Agent] Total reasoning text length:', reasoningText.length);
+                    }
                 }
             }
         } catch (streamError) {
@@ -229,7 +239,7 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
 
         console.log('[Agent] Stream complete. Total characters:', charCount);
 
-        // Signal completion
+        // Signal completion (keep MCP connections alive for reuse)
         yield { type: 'done' };
     } catch (error) {
         console.error('[Agent] Error in runAgentStream:', error);

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { ChatMessage } from '@agentic/shared';
 
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function MessageBubble({ message }: Props) {
+    const [showThinking, setShowThinking] = useState(false);
     const isUser = message.role === 'user';
 
     return (
@@ -23,6 +25,20 @@ export function MessageBubble({ message }: Props) {
                                 <div key={idx} className="prose prose-sm max-w-none">
                                     <ReactMarkdown>{content.text}</ReactMarkdown>
                                 </div>
+                            );
+                        case 'thinking':
+                            return (
+                                <details key={idx} className="mb-2">
+                                    <summary
+                                        className="cursor-pointer text-sm text-gray-600 hover:text-gray-800 font-medium"
+                                        onClick={() => setShowThinking(!showThinking)}
+                                    >
+                                        💭 Thinking process {showThinking ? '▼' : '▶'}
+                                    </summary>
+                                    <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200 text-xs text-gray-700">
+                                        <ReactMarkdown>{content.text}</ReactMarkdown>
+                                    </div>
+                                </details>
                             );
                         case 'image':
                             return (

@@ -4,6 +4,7 @@ export const LLMConfigSchema = z.object({
     provider: z.enum(['gemini', 'openai-compatible']),
     model: z.string(),
     baseUrl: z.string().optional(), // For OpenAI-compatible
+    apiKey: z.string().optional(),
     temperature: z.number().default(0.7),
 });
 

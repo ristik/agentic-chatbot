@@ -13,7 +13,7 @@ export function createLLMProvider(config: LLMConfig) {
         case 'openai-compatible': {
             const provider = createOpenAICompatible({
                 baseURL: config.baseUrl!,
-                apiKey: process.env.OPENAI_COMPATIBLE_API_KEY || 'not-needed',
+                apiKey: config.apiKey || 'not-needed',
                 name: 'custom-llm',
             });
             return provider(config.model);

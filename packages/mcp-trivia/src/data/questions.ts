@@ -209,7 +209,7 @@ export const questions: TriviaQuestion[] = [
         id: '25',
         category: 'Science',
         question: 'What phenomenon causes the northern lights?',
-        correctAnswer: 'Solar wind interacting with Earth's magnetic field',
+        correctAnswer: 'Solar wind interacting with Earth\'s magnetic field',
         incorrectAnswers: ['Volcanic eruptions', 'Meteor showers', 'Lightning storms'],
         difficulty: 'hard',
     },

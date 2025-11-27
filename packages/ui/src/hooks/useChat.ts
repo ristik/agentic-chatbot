@@ -8,9 +8,12 @@ export function useChat() {
     const {
         currentActivityId,
         isStreaming,
+        currentStatus,
         addMessage,
         appendToLastMessage,
+        appendThinkingToLastMessage,
         setStreaming,
+        setStatus,
         getCurrentMessages,
     } = useChatStore();
 
@@ -69,7 +72,14 @@ export function useChat() {
                         try {
                             const data = JSON.parse(line.slice(6));
                             if (data.type === 'text-delta') {
+                                setStatus(null); // Clear status when text starts
                                 appendToLastMessage(data.text);
+                            } else if (data.type === 'reasoning') {
+                                setStatus('Thinking...');
+                                appendThinkingToLastMessage(data.text);
+                            } else if (data.type === 'tool-call') {
+                                const toolName = data.toolName?.replace(/_/g, ' ') || 'tool';
+                                setStatus(`Using ${toolName}...`);
                             }
                         } catch {
                             // Ignore parse errors for incomplete chunks
@@ -82,12 +92,14 @@ export function useChat() {
             appendToLastMessage('\n\n_I encountered a connection issue. Please try again._');
         } finally {
             setStreaming(false);
+            setStatus(null);
         }
-    }, [currentActivityId, isStreaming, getCurrentMessages, addMessage, appendToLastMessage, setStreaming]);
+    }, [currentActivityId, isStreaming, getCurrentMessages, addMessage, appendToLastMessage, appendThinkingToLastMessage, setStreaming, setStatus]);
 
     return {
         messages: getCurrentMessages(),
         isStreaming,
+        currentStatus,
         sendMessage,
     };
 }
