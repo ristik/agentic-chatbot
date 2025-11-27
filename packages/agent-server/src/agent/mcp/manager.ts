@@ -59,11 +59,18 @@ export class McpManager {
         }
     }
 
-    async getTools(context?: ToolContext): Promise<Record<string, CoreTool>> {
+    async getTools(serverNames: string[], context?: ToolContext): Promise<Record<string, CoreTool>> {
         const tools: Record<string, CoreTool> = {};
+        const allowedServers = new Set(serverNames);
 
         for (const [serverName, { client }] of this.connections) {
+            // Only include tools from servers that are in the allowed list
+            if (!allowedServers.has(serverName)) {
+                continue;
+            }
+
             const { tools: mcpTools } = await client.listTools();
+            console.log(`[MCP] Loading ${mcpTools.length} tools from ${serverName}`);
 
             for (const mcpTool of mcpTools) {
                 const toolName = `${serverName}_${mcpTool.name}`;

@@ -28,7 +28,7 @@ A modular, agentic chatbot platform built with React, Node.js, and the Model Con
 │  - Thinking/reasoning display                               │
 └─────────────────┬───────────────────────────────────────────┘
                   │ HTTP/SSE
-┌─────────────────▼──────────────────────────────────────────┐
+┌─────────────────▼───────────────────────────────────────────┐
 │                    Agent Server (Node.js)                   │
 │  - Activity routing                                         │
 │  - LLM orchestration (Gemini, OpenAI-compatible)            │
@@ -39,7 +39,7 @@ A modular, agentic chatbot platform built with React, Node.js, and the Model Con
                   │ MCP over HTTP
          ┌────────┴────────┐
          │                 │
-┌────────▼─────┐  ┌──────▼───────┐
+┌────────▼──────┐  ┌──────▼────────┐
 │ MCP Server    │  │ MCP Server    │
 │  (Trivia)     │  │  (Web Fetch)  │
 │               │  │               │

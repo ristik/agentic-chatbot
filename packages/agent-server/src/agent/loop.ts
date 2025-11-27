@@ -116,8 +116,11 @@ export async function* runAgentStream(ctx: AgentContext) {
 
         // Connect to MCP servers (reuses existing connections)
         await globalMcpManager.connect(activity.mcpServers);
-        const mcpTools = await globalMcpManager.getTools({ userId });
-        console.log('[Agent] Tools loaded:', Object.keys({ ...localTools, ...mcpTools }));
+
+        // Get tools only from servers configured for this activity
+        const allowedServerNames = activity.mcpServers.map(s => s.name);
+        const mcpTools = await globalMcpManager.getTools(allowedServerNames, { userId });
+        console.log('[Agent] Tools loaded for activity', activity.id + ':', Object.keys({ ...localTools, ...mcpTools }));
 
         const allTools = { ...localTools, ...mcpTools };
 
