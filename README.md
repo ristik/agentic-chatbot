@@ -359,7 +359,6 @@ export interface TriviaQuestion {
     question: string;        // The question text
     correctAnswer: string;   // The correct answer
     incorrectAnswers: string[];  // Array of 3 wrong answers
-    difficulty: 'easy' | 'medium' | 'hard';
 }
 ```
 
@@ -378,7 +377,6 @@ export const questions: TriviaQuestion[] = [
         question: 'What is the speed of light in a vacuum?',
         correctAnswer: '299,792,458 m/s',
         incorrectAnswers: ['300,000,000 m/s', '186,000 m/s', '3 × 10^8 km/s'],
-        difficulty: 'hard',
     },
     // Add more...
 ];
