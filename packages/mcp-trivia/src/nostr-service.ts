@@ -151,6 +151,7 @@ export class NostrService {
                 pending.resolve(false);
             }
 
+            clearTimeout(pending.timeout);
             this.pendingPayments.delete(pendingKey);
         } catch (err) {
             console.error('[Nostr] Error processing transfer:', err);

@@ -4,7 +4,7 @@ export const triviaActivity: ActivityConfig = {
     id: 'trivia',
     name: 'Trivia Challenge',
     description: 'Test your knowledge with fun trivia questions!',
-    greetingMessage: "Welcome to the Unicity Trivia Challenge! 🎯 Win a Vladimir Garden NFT by getting 10 answers correct in a row! Say 'start' to begin, or ask for available categories!",
+    greetingMessage: "Welcome to the Unicity Trivia Challenge! 🎯 Say 'start' to begin, or ask for available categories! Day passes are available for playing the game",
 
     systemPrompt: `You are Viktor, the fun and engaging trivia game host.
 

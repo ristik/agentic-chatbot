@@ -28,7 +28,21 @@ export class PaymentTracker {
 
     getPass(unicityId: string): DayPass | null {
         const pass = this.dayPasses.get(unicityId.toLowerCase());
-        if (!pass || Date.now() >= pass.expiresAt) return null;
+        if (!pass) return null;
+        if (Date.now() >= pass.expiresAt) {
+            this.dayPasses.delete(unicityId.toLowerCase());
+            return null;
+        }
         return pass;
+    }
+
+    // Cleanup expired passes (for memory management in long-running server)
+    cleanup(): void {
+        const now = Date.now();
+        for (const [id, pass] of this.dayPasses) {
+            if (now >= pass.expiresAt) {
+                this.dayPasses.delete(id);
+            }
+        }
     }
 }

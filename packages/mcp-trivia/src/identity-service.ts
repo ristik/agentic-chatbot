@@ -19,6 +19,7 @@ import { waitInclusionProof } from '@unicitylabs/state-transition-sdk/lib/util/I
 import { NostrKeyManager, NostrClient } from '@unicitylabs/nostr-js-sdk';
 import type { DirectAddress } from '@unicitylabs/state-transition-sdk/lib/address/DirectAddress.js';
 import type { Config } from './config.js';
+import trustbaseJson from './trustbase-testnet.json' with { type: 'json' };
 
 const UNICITY_TOKEN_TYPE_HEX = 'f8aa13834268d29355ff12183066f0cb902003629bbc5eb9ef0efbe397867509';
 
@@ -38,22 +39,20 @@ export class IdentityService {
     private config: Config;
     private aggregatorClient: AggregatorClient;
     private stateTransitionClient: StateTransitionClient;
-    private rootTrustBase: RootTrustBase | null = null;
+    private rootTrustBase: RootTrustBase;
     private identity: Identity | null = null;
     private signingService: SigningService | null = null;
     private nametagToken: Token<any> | null = null;
 
     constructor(config: Config) {
         this.config = config;
-        this.aggregatorClient = new AggregatorClient(config.aggregatorUrl);
+        this.aggregatorClient = new AggregatorClient(config.aggregatorUrl, config.aggregatorApiKey);
         this.stateTransitionClient = new StateTransitionClient(this.aggregatorClient);
+        this.rootTrustBase = RootTrustBase.fromJSON(trustbaseJson);
     }
 
     async initialize(): Promise<void> {
         console.log('[Identity] Initializing...');
-
-        // Load trust base
-        this.loadTrustBase();
 
         // Ensure data directory exists
         this.ensureDataDir();
@@ -84,15 +83,6 @@ export class IdentityService {
 
         // Ensure Nostr binding is published
         await this.ensureNostrBinding();
-    }
-
-    private loadTrustBase(): void {
-        if (!fs.existsSync(this.config.trustBasePath)) {
-            throw new Error(`Trust base file not found: ${this.config.trustBasePath}`);
-        }
-        const trustBaseJson = JSON.parse(fs.readFileSync(this.config.trustBasePath, 'utf-8'));
-        this.rootTrustBase = RootTrustBase.fromJSON(trustBaseJson);
-        console.log('[Identity] Trust base loaded');
     }
 
     private ensureDataDir(): void {
@@ -386,9 +376,6 @@ export class IdentityService {
     }
 
     getRootTrustBase(): RootTrustBase {
-        if (!this.rootTrustBase) {
-            throw new Error('Trust base not loaded');
-        }
         return this.rootTrustBase;
     }
 }

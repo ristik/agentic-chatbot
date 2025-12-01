@@ -8,6 +8,7 @@ import { loadConfig, type Config } from './config.js';
 import { IdentityService } from './identity-service.js';
 import { NostrService } from './nostr-service.js';
 import { PaymentTracker } from './payment-tracker.js';
+import { WalletService } from './wallet-service.js';
 
 export const DEFAULT_WINNING_STREAK = 10;
 
@@ -18,6 +19,7 @@ export interface TriviaServerOptions {
     // Payment services (optional for testing)
     nostrService?: NostrService;
     paymentTracker?: PaymentTracker;
+    walletService?: WalletService;
     config?: Config;
 }
 
@@ -74,6 +76,7 @@ export function createTriviaServer(options: TriviaServerOptions = {}): { server:
     const winningStreak = options.winningStreak ?? DEFAULT_WINNING_STREAK;
     const nostrService = options.nostrService;
     const paymentTracker = options.paymentTracker;
+    const walletService = options.walletService;
     const config = options.config;
 
     // Check if payment is enabled
@@ -363,6 +366,55 @@ export function createTriviaServer(options: TriviaServerOptions = {}): { server:
         }
     );
 
+    // Tool: Get wallet balance (admin only)
+    server.tool(
+        'get_wallet_balance',
+        'Get the wallet balance for the trivia server (admin only)',
+        {
+            admin_password: z.string().describe('Admin password for authentication'),
+        },
+        async ({ admin_password }) => {
+            if (!config || !walletService) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({ error: 'Wallet service not available' }) }],
+                };
+            }
+
+            if (admin_password !== config.adminPassword) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({ error: 'Invalid admin password' }) }],
+                };
+            }
+
+            try {
+                const summary = await walletService.getWalletSummary();
+                return {
+                    content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            totalTokens: summary.totalTokens,
+                            balances: summary.balances.map(b => ({
+                                coinId: b.coinId,
+                                amount: b.amount.toString(),
+                                tokenCount: b.tokenCount,
+                            })),
+                        }),
+                    }],
+                };
+            } catch (error) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            error: 'Failed to get wallet balance',
+                            message: error instanceof Error ? error.message : String(error),
+                        }),
+                    }],
+                };
+            }
+        }
+    );
+
     return { server, state };
 }
 
@@ -372,6 +424,7 @@ async function main() {
     let identityService: IdentityService | null = null;
     let nostrService: NostrService | null = null;
     let paymentTracker: PaymentTracker | null = null;
+    let walletService: WalletService | null = null;
 
     // Try to load payment config
     try {
@@ -388,11 +441,13 @@ async function main() {
         await nostrService.connect();
 
         paymentTracker = new PaymentTracker(config.dayPassHours);
+        walletService = new WalletService(config);
 
         console.log('[Trivia] Payment services initialized');
     } catch (error) {
         console.log('[Trivia] Payment not configured, running in free mode');
         console.log(`[Trivia] Reason: ${error instanceof Error ? error.message : String(error)}`);
+        console.log(error);
 
         // Create minimal config for non-payment mode
         config = {
@@ -410,6 +465,7 @@ async function main() {
         winningStreak,
         nostrService: nostrService || undefined,
         paymentTracker: paymentTracker || undefined,
+        walletService: walletService || undefined,
         config: nostrService ? config : undefined,
     });
 

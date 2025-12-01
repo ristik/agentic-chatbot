@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -28,6 +26,7 @@ services:
       WINNING_STREAK: ${WINNING_STREAK:-10}
       # Payment configuration (optional - server runs in free mode without these)
       AGGREGATOR_URL: ${AGGREGATOR_URL:-}
+      AGGREGATOR_API_KEY: ${AGGREGATOR_API_KEY:-}
       NOSTR_RELAY_URL: ${NOSTR_RELAY_URL:-}
       TRIVIA_PRIVATE_KEY: ${TRIVIA_PRIVATE_KEY:-}
       TRIVIA_NAMETAG: ${TRIVIA_NAMETAG:-}
@@ -36,9 +35,8 @@ services:
       DAY_PASS_HOURS: ${DAY_PASS_HOURS:-24}
       PAYMENT_TIMEOUT_SECONDS: ${PAYMENT_TIMEOUT_SECONDS:-120}
       DATA_DIR: /app/data
-      TRUST_BASE_PATH: /app/trust-base.json
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
-      - ./trust-base.json:/app/trust-base.json:ro
       - trivia-data:/app/data
 
   mcp-web:

@@ -3,6 +3,7 @@ export interface Config {
     winningStreak: number;
     // Payment config
     aggregatorUrl: string;
+    aggregatorApiKey: string;
     nostrRelayUrl: string;
     privateKeyHex: string;
     nametag: string;
@@ -11,7 +12,7 @@ export interface Config {
     dayPassHours: number;
     paymentTimeoutMs: number;
     dataDir: string;
-    trustBasePath: string;
+    adminPassword: string;
 }
 
 export function loadConfig(): Config {
@@ -40,10 +41,16 @@ export function loadConfig(): Config {
         throw new Error('PAYMENT_COIN_ID is required');
     }
 
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword) {
+        throw new Error('ADMIN_PASSWORD is required');
+    }
+
     return {
         port: parseInt(process.env.PORT || '3001', 10),
         winningStreak: parseInt(process.env.WINNING_STREAK || '10', 10),
         aggregatorUrl,
+        aggregatorApiKey: process.env.AGGREGATOR_API_KEY || 'sk_06365a9c44654841a366068bcfc68986',
         nostrRelayUrl,
         privateKeyHex,
         nametag,
@@ -52,6 +59,6 @@ export function loadConfig(): Config {
         dayPassHours: parseInt(process.env.DAY_PASS_HOURS || '24', 10),
         paymentTimeoutMs: parseInt(process.env.PAYMENT_TIMEOUT_SECONDS || '120', 10) * 1000,
         dataDir: process.env.DATA_DIR || './data',
-        trustBasePath: process.env.TRUST_BASE_PATH || './trust-base.json',
+        adminPassword,
     };
 }
