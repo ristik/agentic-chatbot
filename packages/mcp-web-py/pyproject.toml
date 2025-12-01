@@ -1,0 +1,27 @@
+[project]
+name = "mcp-web-py"
+version = "1.0.0"
+description = "Python MCP server for web search, fetch, and JSON operations"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=1.0.0",
+    "ddgs>=6.3.8",
+    "trafilatura>=1.12.2",
+    "readability-lxml>=0.8.1",
+    "requests>=2.32.0",
+    "html2text>=2024.2.26",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+mcp-web = "src.server:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

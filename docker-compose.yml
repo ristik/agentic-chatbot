@@ -43,8 +43,8 @@ services:
 
   mcp-web:
     build:
-      context: .
-      dockerfile: packages/mcp-web/Dockerfile
+      context: ./packages/mcp-web-py
+      dockerfile: Dockerfile
     ports:
       - "3002:3002"
     environment:

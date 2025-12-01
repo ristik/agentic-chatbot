@@ -21,9 +21,24 @@ chatRouter.post('/stream', async (c) => {
         return c.json({ error: 'Unknown activity' }, 404);
     }
 
+    // Extract user IP for geolocation-based features
+    const userIp = c.req.header('x-forwarded-for')?.split(',')[0].trim()
+                 || c.req.header('x-real-ip')
+                 || 'unknown';
+
+    // TODO: Add IP-to-country lookup service if needed
+    // For now, we can use a simple service or leave country detection to client
+    const userCountry = c.req.header('cf-ipcountry'); // Cloudflare header if available
+
     return streamSSE(c, async (stream) => {
         try {
-            const agentStream = runAgentStream({ activity, userId, messages });
+            const agentStream = runAgentStream({
+                activity,
+                userId,
+                messages,
+                userIp,
+                userCountry
+            });
 
             for await (const event of agentStream) {
                 await stream.writeSSE({

@@ -11,6 +11,8 @@ interface ConnectedMcp {
 
 interface ToolContext {
     userId?: string;
+    userIp?: string;
+    userCountry?: string;
 }
 
 export class McpManager {
@@ -80,11 +82,17 @@ export class McpManager {
                     description: mcpTool.description || '',
                     parameters: this.jsonSchemaToZod(mcpTool.inputSchema),
                     execute: async (args) => {
-                        // Pass userId in metadata for stateful MCP servers
+                        // Pass user metadata to MCP servers for context-aware features
+                        const meta = context ? {
+                            userId: context.userId,
+                            userIp: context.userIp,
+                            userCountry: context.userCountry,
+                        } : undefined;
+
                         const result = await client.callTool({
                             name: mcpTool.name,
                             arguments: args,
-                            _meta: context?.userId ? { userId: context.userId } : undefined,
+                            _meta: meta,
                         });
                         return result.content;
                     },

@@ -11,6 +11,8 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+__pycache__/
+*.egg-info/
 
 # Logs
 logs/

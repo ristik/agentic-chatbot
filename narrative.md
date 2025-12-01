@@ -31,14 +31,14 @@ Let's work by layers:
 We want to reach a working POC with rather trivial activity (e.g. sports betting or a trivia game)
 
 -----------
-    ignore the wallet, it is a custom development we'll fill in later. A mockup is even better.
-    Target is traditional: docker containers etc on our own dedicated server.
-    LLM Priorities: external own LLM accessible over OpenAI compatible protocol, Google. (gemini flash.latest is the default choice). Streaming is required for best UX.
-    Wallet will provide ID; we can mock it initially.
-    Let's assume for generality that there can be multiple remote MCP servers.
-    Trivia game is okay, when we have all components populated (package the game as MCP)
-    Until user resets his browser local storage; memory is per activity (agent has same personality, but activities are different)
-    keep it simple. Point is that if we are based on existing component then it should not have too much user exposed complexity.
+- ignore the wallet, it is a custom development we'll fill in later. A mockup is even better.
+- Target is traditional: docker containers etc on our own dedicated server.
+- LLM Priorities: external own LLM accessible over OpenAI compatible protocol, Google. (gemini flash.latest is the default choice). Streaming is required for best UX.
+- Wallet will provide ID; we can mock it initially.
+- Let's assume for generality that there can be multiple remote MCP servers.
+- Trivia game is okay, when we have all components populated (package the game as MCP)
+- Until user resets his browser local storage; memory is per activity (agent has same personality, but activities are different)
+- Keep the chat UI simple. Point is that if we are based on existing component then it should not have too much user exposed complexity.
 
 -------
 ## Technology Stack
