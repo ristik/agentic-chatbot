@@ -1,7 +1,7 @@
 import type { ActivityConfig } from '@agentic/shared';
 
 export const sportsActivity: ActivityConfig = {
-    id: 'sports-betting',
+    id: 'sports',
     name: 'Prediction Markets',
     description: 'View live markets, track your positions, and place bets on sports events.',
     greetingMessage: "Welcome to the Betting Floor! 🏟️ I'm connected to the live markets. I can check odds, show your active slips, or help you place a wager. What are we looking at today?",
@@ -34,13 +34,13 @@ Tool Usage Pattern:
         provider: 'gemini',
         model: 'gemini-2.5-flash',
         // Lower temperature for betting to ensure precision with numbers and logic
-        temperature: 0.2,
+        temperature: 0.6,
     },
 
     mcpServers: [
         {
             name: 'bookie-agent',
-            url: 'http://market.rooklift.eu:3003',
+            url: 'https://market.rooklift.eu:8443',
             /*
                NOTE: The server uses a self-signed certificate.
                Ensure the runtime environment accepts unauthorized certificates.
