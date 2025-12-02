@@ -74,6 +74,16 @@ export class McpManager {
             const { tools: mcpTools } = await client.listTools();
             console.log(`[MCP] Loading ${mcpTools.length} tools from ${serverName}`);
 
+            // Debug: Log tool details if DEBUG_MCP is enabled
+            if (process.env.DEBUG_MCP === 'true') {
+                console.log(`[MCP Debug] Tools from ${serverName}:`);
+                mcpTools.forEach((tool, idx) => {
+                    console.log(`[MCP Debug]   ${idx + 1}. ${tool.name}`);
+                    console.log(`[MCP Debug]      Description: ${tool.description}`);
+                    console.log(`[MCP Debug]      Input Schema:`, JSON.stringify(tool.inputSchema, null, 2));
+                });
+            }
+
             for (const mcpTool of mcpTools) {
                 const toolName = `${serverName}_${mcpTool.name}`;
 
@@ -89,11 +99,28 @@ export class McpManager {
                             userCountry: context.userCountry,
                         } : undefined;
 
+                        // Debug: Log MCP tool call
+                        if (process.env.DEBUG_MCP === 'true') {
+                            console.log(`[MCP Debug] Calling tool: ${serverName}_${mcpTool.name}`);
+                            console.log(`[MCP Debug]   Arguments:`, JSON.stringify(args, null, 2));
+                            console.log(`[MCP Debug]   Metadata:`, JSON.stringify(meta, null, 2));
+                        }
+
                         const result = await client.callTool({
                             name: mcpTool.name,
                             arguments: args,
                             _meta: meta,
                         });
+
+                        // Debug: Log MCP tool response
+                        if (process.env.DEBUG_MCP === 'true') {
+                            console.log(`[MCP Debug] Response from ${serverName}_${mcpTool.name}:`);
+                            console.log(`[MCP Debug]   Content:`, JSON.stringify(result.content, null, 2));
+                            if (result.isError) {
+                                console.log(`[MCP Debug]   Error: true`);
+                            }
+                        }
+
                         return result.content;
                     },
                 });

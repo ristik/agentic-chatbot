@@ -802,6 +802,10 @@ MCP_WEB_URL=http://localhost:3002/mcp
 
 # Server Port
 PORT=3000
+
+# Debug Flags (optional, for development)
+DEBUG_PROMPTS=false  # Set to 'true' to log system prompts and template processing
+DEBUG_MCP=false      # Set to 'true' to log MCP tool calls and responses
 ```
 
 ### Production (.env)
@@ -981,6 +985,124 @@ pnpm db:migrate
 cd packages/agent-server
 pnpm db:push
 ```
+
+### Debugging
+
+The agent-server supports detailed debug logging for development and troubleshooting.
+
+#### DEBUG_PROMPTS
+
+Logs system prompt processing and template variable substitution.
+
+**Enable**:
+```bash
+# In .env or docker-compose.yml
+DEBUG_PROMPTS=true
+```
+
+**Output includes**:
+- Raw system prompt (with template tags like `{{userId}}`)
+- Template context (all available variables)
+- Processed system prompt (with values substituted)
+- Final enhanced system prompt sent to LLM
+- Complete message array
+
+**Example output**:
+```
+[Template] Raw system prompt: You are Viktor...User ID: {{userId}}...
+[Template] Context: {
+  userId: 'user_abc123',
+  serverTime: '2025-12-02T14:30:00.000Z',
+  userTimezone: 'Europe/Tallinn',
+  userLocale: 'et-EE',
+  userLanguage: 'et',
+  userRegion: 'EE',
+  localTime: '12/02/2025, 16:30:00'
+}
+[Template] Processed system prompt: You are Viktor...User ID: user_abc123...
+
+FINAL SYSTEM PROMPT:
+[Full prompt with all enhancements]
+```
+
+**Use case**: Debug activity template tags, verify user context is being captured
+
+#### DEBUG_MCP
+
+Logs all MCP tool discovery, calls, and responses.
+
+**Enable**:
+```bash
+# In .env or docker-compose.yml
+DEBUG_MCP=true
+```
+
+**Output includes**:
+- Tool discovery (list of tools from each MCP server)
+- Tool schemas (input parameters and descriptions)
+- Tool call arguments
+- Metadata passed to tools (userId, userIp, userCountry)
+- Full tool response content
+- Error flags
+
+**Example output**:
+```
+[MCP] Loading 3 tools from web
+[MCP Debug] Tools from web:
+[MCP Debug]   1. web_search
+[MCP Debug]      Description: Search the web using DuckDuckGo
+[MCP Debug]      Input Schema: {
+  "type": "object",
+  "properties": {
+    "query": { "type": "string", "description": "Search query" },
+    "max_results": { "type": "number", "description": "Max results" }
+  }
+}
+
+[MCP Debug] Calling tool: web_search
+[MCP Debug]   Arguments: {
+  "query": "latest AI news",
+  "max_results": 5
+}
+[MCP Debug]   Metadata: {
+  "userId": "user_abc123",
+  "userIp": "192.168.1.1",
+  "userCountry": "EE"
+}
+
+[MCP Debug] Response from web_search:
+[MCP Debug]   Content: [
+  {
+    "type": "text",
+    "text": "{\"results\": [...]}"
+  }
+]
+```
+
+**Use case**: Debug MCP tool integrations, verify tools are being called correctly, inspect tool responses
+
+#### Enabling Both Flags
+
+For comprehensive debugging:
+
+```bash
+# In .env
+DEBUG_PROMPTS=true
+DEBUG_MCP=true
+
+# Restart agent-server
+docker-compose restart agent-server
+
+# Watch logs with filtering
+docker-compose logs -f agent-server | grep -E '\[MCP|Template\]'
+```
+
+#### Production Warning
+
+⚠️ **Never enable debug flags in production**:
+- Logs may contain sensitive user data
+- Performance impact from verbose logging
+- Large log files can fill disk space
 
 ### Code Style
 
