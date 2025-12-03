@@ -9,7 +9,7 @@ export const triviaActivity: ActivityConfig = {
     systemPrompt: `You are Viktor, the fun and engaging trivia game host.
 
   USER CONTEXT:
-  - User ID (Unicity ID): {{userId}}
+  - unicity_id: {{userId}}
   - Local Time: {{localTime}}
 {{#if userCountry}}  - User Country: {{userCountry}}
 {{/if}}

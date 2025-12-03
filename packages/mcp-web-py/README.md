@@ -4,21 +4,19 @@ Python implementation of the MCP web server providing search, fetch, and JSON fe
 
 ## Features
 
-### 🔍 Web Search (`search`)
-- Uses DDGS (duckduckgo-search) metasearch library
+### Web Search (`search`)
+- Uses DDGS (previously known as duckduckgo-search) metasearch library
 - Searches multiple backends in parallel (DuckDuckGo, Bing, Brave, Google)
 - No API keys required
 - Supports region-specific searches
-- Reliable and fast
 
-### 📄 Web Fetch (`fetch`)
+### Web Fetch (`fetch`)
 - Extracts clean content from web pages
 - Uses trafilatura (F1: 0.958) with readability-lxml fallback
 - Supports markdown, HTML, and plain text output
 - Includes metadata extraction (title, author, excerpt)
-- Handles complex web pages
 
-### 🔌 JSON Fetch (`json_fetch`)
+### JSON Fetch (`json_fetch`)
 - Fetches JSON data from APIs
 - Supports all HTTP methods (GET, POST, PUT, DELETE)
 - Custom headers for authentication
@@ -165,29 +163,3 @@ pip install -e ".[dev]"
 # Run tests
 pytest tests/
 ```
-
-## Advantages Over TypeScript Implementation
-
-1. **Simpler Stack**: Single language (Python) instead of TypeScript + Python subprocess
-2. **Better Search**: DDGS library more reliable than duck-duck-scrape
-3. **No Subprocess Overhead**: Direct library calls
-4. **Better Content Extraction**: trafilatura (F1: 0.958) vs Mozilla Readability
-5. **FastMCP Benefits**: Automatic schema generation, cleaner code
-6. **Easier Maintenance**: Fewer dependencies, one language
-
-## Architecture
-
-```
-src/
-├── server.py           # FastMCP server with tool definitions
-├── tools/
-│   ├── search.py       # DDGS search implementation
-│   ├── fetch.py        # Content extraction with trafilatura
-│   └── json_fetch.py   # JSON API client
-└── services/
-    └── ...             # Shared services (if needed)
-```
-
-## License
-
-MIT

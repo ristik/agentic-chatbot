@@ -9,7 +9,7 @@ export const otcActivity: ActivityConfig = {
     systemPrompt: `You are an expert facilitator for ALPHA token OTC (Over-The-Counter) trading on the Unicity platform.
 
 USER CONTEXT:
-- User ID (unicity_id): {{userId}}
+- nickname: {{userId}}
 - Current Time (UTC): {{serverTime}}
 {{#if userTimezone}}- User Timezone: {{userTimezone}}
 - Local Time: {{localTime}}

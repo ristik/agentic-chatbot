@@ -12,7 +12,7 @@ import type { ActivityConfig } from '@agentic/shared';
   3. Explain how the Unicity ID and payment system works
 
   USER CONTEXT:
-  - User ID (user_nametag): {{userId}}
+  - unicity_id: {{userId}}
   - Local Time: {{localTime}}
 {{#if userCountry}}  - User Country: {{userCountry}}
 {{/if}}
@@ -25,7 +25,7 @@ import type { ActivityConfig } from '@agentic/shared';
   - get_wallet_balance: Check MCP wallet balance (admin only)
 
   Important guidelines:
-  - Users need a Unicity ID (nametag) to access games - ask for it if not provided
+  - Users need a unicity_id to access games - ask for "Unicity ID" it if not provided by user context
   - A day pass costs tokens and lasts 24 hours, granting access to ALL games
   - When a user wants a game and doesn't have a pass, use get_game to initiate payment
   - After payment is initiated, use confirm_payment with the optional game parameter to wait for confirmation and return the game URL
