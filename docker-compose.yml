@@ -1,21 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: agentic
-      POSTGRES_PASSWORD: agentic_secret
-      POSTGRES_DB: agentic
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    # docker local only
-    #   - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentic"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
   mcp-trivia:
     build:
       context: .
@@ -59,7 +42,6 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
-      DATABASE_URL: postgres://agentic:agentic_secret@postgres:5432/agentic
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       AMA_API_KEY: ${AMA_API_KEY}
       MCP_TRIVIA_URL: http://mcp-trivia:3001/mcp
@@ -69,25 +51,22 @@ services:
       DEBUG_MCP: ${DEBUG_MCP:-false}
       NODE_ENV: ${NODE_ENV:-development}
     depends_on:
-      postgres:
-        condition: service_healthy
       mcp-trivia:
         condition: service_started
       mcp-web:
         condition: service_started
     restart: unless-stopped
 
-  ui:
-    build:
-      context: .
-      dockerfile: packages/ui/Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-        VITE_BASE_PATH: ${VITE_BASE_PATH:-/}
-    ports:
-      - "5173:80"
-    restart: unless-stopped
+  #ui:
+  #  build:
+  #    context: .
+  #    dockerfile: packages/ui/Dockerfile
+  #    args:
+  #      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+  #      VITE_BASE_PATH: ${VITE_BASE_PATH:-/}
+  #  ports:
+  #    - "5173:80"
+  #  restart: unless-stopped
 
 volumes:
-  postgres_data:
   trivia-data:

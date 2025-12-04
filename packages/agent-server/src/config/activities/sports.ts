@@ -13,8 +13,10 @@ export const sportsActivity: ActivityConfig = {
 
 USER CONTEXT:
   - unicity_id: {{userId}}
-  - Local Time: {{localTime}}
+  - Server Time: {{serverTime}}
 {{#if userCountry}}  - User Country: {{userCountry}}
+{{/if}}
+{{#if formattedMemory}}{{formattedMemory}}
 {{/if}}
 
 Available tools:

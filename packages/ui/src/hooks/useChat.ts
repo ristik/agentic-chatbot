@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import type { ChatMessage } from '@agentic/shared';
 import { generateUUID } from '../utils/uuid';
+import { loadMemory, saveMemory, isLocalStorageAvailable } from '../utils/memory';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -37,6 +38,11 @@ export function useChat() {
         const userId = localStorage.getItem('userId') || 'anonymous';
         const messages = getCurrentMessages();
 
+        // Load current memory state from localStorage
+        const memoryState = isLocalStorageAvailable()
+            ? loadMemory(userId, currentActivityId)
+            : {};
+
         // Add user message
         const userMessage: ChatMessage = {
             id: generateUUID(),
@@ -65,6 +71,7 @@ export function useChat() {
                     userId,
                     messages: [...messages, userMessage],
                     userContext: getUserContext(userId),
+                    memoryState, // Send localStorage data to backend
                 }),
             });
 
@@ -95,6 +102,11 @@ export function useChat() {
                             } else if (data.type === 'tool-call') {
                                 const toolName = data.toolName?.replace(/_/g, ' ') || 'tool';
                                 setStatus(`Using ${toolName}...`);
+                            } else if (data.type === 'memory-update') {
+                                // Handle memory updates from backend
+                                if (isLocalStorageAvailable() && data.memoryState) {
+                                    saveMemory(userId, currentActivityId, data.memoryState);
+                                }
                             }
                         } catch {
                             // Ignore parse errors for incomplete chunks

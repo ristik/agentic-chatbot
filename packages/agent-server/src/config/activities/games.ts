@@ -13,8 +13,10 @@ import type { ActivityConfig } from '@agentic/shared';
 
   USER CONTEXT:
   - unicity_id: {{userId}}
-  - Local Time: {{localTime}}
+  - Server Time: {{serverTime}}
 {{#if userCountry}}  - User Country: {{userCountry}}
+{{/if}}
+{{#if formattedMemory}}{{formattedMemory}}
 {{/if}}
 
   Available tools:
@@ -51,6 +53,4 @@ import type { ActivityConfig } from '@agentic/shared';
           primaryColor: '#10b981', // Emerald green
           name: 'gaming',
       },
-
-      persistChatHistory: true,
   };

@@ -1,57 +1,85 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { db } from '../../db/client.js';
-import { userMemory } from '../../db/schema.js';
-import { eq, and } from 'drizzle-orm';
 
 export interface ToolContext {
     userId: string;
     activityId: string;
+    // Memory state from client's localStorage
+    memoryState: Record<string, any>;
 }
 
+/**
+ * Format memory state as human-readable text for system prompt injection
+ * Returns undefined if no memory exists (so template {{else}} block can handle it)
+ */
+export function formatMemoryForPrompt(memoryState: Record<string, any>, userId: string): string | undefined {
+    const entries = Object.entries(memoryState);
+
+    if (entries.length === 0) {
+        return undefined; // Let template's {{else}} block handle empty state
+    }
+
+    // Format preferences as readable text
+    const formattedEntries = entries.map(([key, value]) => {
+        const formattedValue = typeof value === 'object'
+            ? JSON.stringify(value, null, 2)
+            : String(value);
+        return `  - ${key}: ${formattedValue}`;
+    });
+
+    return `User ${userId} has ${entries.length} stored preference(s):\n${formattedEntries.join('\n')}`;
+}
+
+/**
+ * Creates a stateless memory tool that operates on the passed-in memoryState
+ * All changes are made to the memoryState object, which will be returned to the client
+ */
 export function createMemoryTool(ctx: ToolContext) {
+    const { userId, activityId, memoryState } = ctx;
+
     return tool({
-        description: 'Store or retrieve user-specific information for personalization. Use this to remember user preferences, past choices, scores, etc.',
+        description: `Store or retrieve user-specific information for personalization. Use this to remember user preferences, past choices, etc. across the sessions.
+
+Actions:
+- get: Retrieve a single value by key
+- set: Store a value with a key
+- list: Get all key-value pairs as structured data
+- pull: Get all preferences formatted as human-readable text for context`,
         parameters: z.object({
-            action: z.enum(['get', 'set', 'list']).describe('Action to perform'),
+            action: z.enum(['get', 'set', 'list', 'pull']).describe('Action to perform'),
             key: z.string().optional().describe('Memory key (required for get/set)'),
             value: z.any().optional().describe('Value to store (required for set)'),
         }),
         execute: async ({ action, key, value }) => {
-            const { userId, activityId } = ctx;
-
             switch (action) {
                 case 'get': {
                     if (!key) return { error: 'Key required for get' };
-                    const result = await db.query.userMemory.findFirst({
-                        where: and(
-                            eq(userMemory.userId, userId),
-                            eq(userMemory.activityId, activityId),
-                            eq(userMemory.key, key)
-                        ),
-                    });
-                    return result ? { key, value: result.value } : { key, value: null };
+                    const storedValue = memoryState[key];
+                    return { key, value: storedValue ?? null };
                 }
 
                 case 'set': {
                     if (!key) return { error: 'Key required for set' };
-                    await db.insert(userMemory)
-                        .values({ userId, activityId, key, value, updatedAt: new Date() })
-                        .onConflictDoUpdate({
-                            target: [userMemory.userId, userMemory.activityId, userMemory.key],
-                            set: { value, updatedAt: new Date() },
-                        });
+                    memoryState[key] = value;
                     return { success: true, key };
                 }
 
                 case 'list': {
-                    const results = await db.query.userMemory.findMany({
-                        where: and(
-                            eq(userMemory.userId, userId),
-                            eq(userMemory.activityId, activityId)
-                        ),
-                    });
-                    return { memories: results.map(r => ({ key: r.key, value: r.value })) };
+                    const memories = Object.entries(memoryState).map(([key, value]) => ({
+                        key,
+                        value,
+                    }));
+                    return { memories };
+                }
+
+                case 'pull': {
+                    const entries = Object.entries(memoryState);
+                    const summary = formatMemoryForPrompt(memoryState, userId);
+                    return {
+                        summary,
+                        preferences: memoryState,
+                        count: entries.length,
+                    };
                 }
             }
         },

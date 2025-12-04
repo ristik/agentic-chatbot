@@ -1,7 +1,7 @@
 import { streamText, type CoreMessage } from 'ai';
 import { createLLMProvider } from './llm/providers.js';
 import { processTemplate, buildTemplateContext } from './llm/prompt-templates.js';
-import { createMemoryTool, type ToolContext } from './tools/memory.js';
+import { createMemoryTool, formatMemoryForPrompt, type ToolContext } from './tools/memory.js';
 import { globalMcpManager } from './mcp/manager.js';
 import type { ActivityConfig, ChatMessage } from '@agentic/shared';
 
@@ -13,6 +13,7 @@ export interface AgentContext {
     userCountry?: string;
     userTimezone?: string;
     userLocale?: string;
+    memoryState?: Record<string, any>; // Initial memory state from client
 }
 
 function getUserFriendlyError(error: unknown): string {
@@ -23,9 +24,18 @@ function getUserFriendlyError(error: unknown): string {
         return '_Sorry, there\'s a configuration issue. Please contact support._';
     }
 
-    // Rate limiting
+    // Rate limiting and quota errors
     if (errorStr.includes('rate limit') || errorStr.includes('429')) {
         return '_I\'m receiving too many requests right now. Please try again in a moment._';
+    }
+
+    // Gemini API quota errors
+    if (errorStr.includes('quota') ||
+        errorStr.includes('RESOURCE_EXHAUSTED') ||
+        errorStr.includes('Peak input tokens') ||
+        errorStr.includes('Peak output tokens') ||
+        errorStr.includes('Requests per minute')) {
+        return '_API quota limit reached. Please wait a moment before trying again._';
     }
 
     // Network errors
@@ -111,8 +121,14 @@ export async function* runAgentStream(ctx: AgentContext) {
         const model = createLLMProvider(activity.llm);
         console.log('[Agent] LLM provider created:', activity.llm.provider, activity.llm.model);
 
-        // Initialize tools
-        const toolContext: ToolContext = { userId, activityId: activity.id };
+        // Initialize tools with memory state from client
+        const memoryState = ctx.memoryState || {}; // Use provided state or empty object
+        console.log('[Agent] Memory state received:', memoryState, 'Keys:', Object.keys(memoryState));
+        const toolContext: ToolContext = {
+            userId,
+            activityId: activity.id,
+            memoryState, // Pass memory state to tool
+        };
         const localTools: Record<string, any> = {};
 
         if (activity.localTools.includes('memory')) {
@@ -130,9 +146,26 @@ export async function* runAgentStream(ctx: AgentContext) {
 
         const allTools = { ...localTools, ...mcpTools };
 
+        // Limit message window to prevent token bloat
+        const MESSAGE_WINDOW_SIZE = 10; // Keep last 10 messages (5 exchanges)
+        const recentMessages = messages.length > MESSAGE_WINDOW_SIZE
+            ? messages.slice(-MESSAGE_WINDOW_SIZE)
+            : messages;
+
+        if (messages.length > MESSAGE_WINDOW_SIZE) {
+            console.log(`[Agent] Limiting conversation window: ${messages.length} -> ${recentMessages.length} messages`);
+        }
+
         // Convert messages to AI SDK format
-        const coreMessages = convertToCoreMessages(messages);
+        const coreMessages = convertToCoreMessages(recentMessages);
         console.log('[Agent] Processing', coreMessages.length, 'messages');
+
+        // Format memory for prompt injection if memory tool is enabled
+        const formattedMemory = activity.localTools.includes('memory')
+            ? formatMemoryForPrompt(memoryState, userId)
+            : undefined;
+
+        console.log('[Agent] Formatted memory for prompt:', formattedMemory);
 
         // Build template context from available user data
         const templateContext = buildTemplateContext(
@@ -140,11 +173,14 @@ export async function* runAgentStream(ctx: AgentContext) {
             userIp,
             userCountry,
             userTimezone,
-            userLocale
+            userLocale,
+            formattedMemory
         );
+
 
         // Process template tags in system prompt
         const processedSystemPrompt = processTemplate(activity.systemPrompt, templateContext);
+
 
         // Add standard message handling instructions
         const enhancedSystemPrompt = `${processedSystemPrompt}
@@ -157,9 +193,8 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
 
         // Debug logging - log the full prompt structure
         if (process.env.DEBUG_PROMPTS === 'true') {
-            console.log('[Template] Raw system prompt:', activity.systemPrompt);
+            // console.log('[Template] Raw system prompt:', activity.systemPrompt);
             console.log('[Template] Context:', templateContext);
-            console.log('[Template] Processed system prompt:', processedSystemPrompt);
             console.log('\nFINAL SYSTEM PROMPT:');
             console.log(enhancedSystemPrompt);
             console.log('\nMESSAGES ARRAY:');
@@ -177,7 +212,6 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
                     console.log(`  Content: ${typeof msg.content === 'string' ? msg.content.substring(0, 200) : JSON.stringify(msg.content).substring(0, 200)}`);
                 }
             });
-            console.log('\nAVAILABLE TOOLS:', Object.keys(allTools));
         }
 
         // Run the agent loop with streaming
@@ -207,7 +241,6 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
             },
         });
 
-        console.log('[Agent] Starting text stream...');
         let charCount = 0;
         let reasoningText = '';
         const debugLLM = process.env.DEBUG_PROMPTS === 'true';
@@ -215,9 +248,6 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
         // Stream the response - use fullStream to get all events
         try {
             for await (const part of result.fullStream) {
-                // if (debugLLM) {
-                //     console.log('[Agent] Stream part type:', part.type);
-                // }
                 if (part.type === 'text-delta') {
                     charCount += part.textDelta.length;
                     yield { type: 'text-delta', text: part.textDelta };
@@ -244,9 +274,10 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
                     }
                 } else if (part.type === 'error') {
                     console.error('[Agent] Stream error:', part.error);
-                    // Send user-friendly error message
+                    // Send user-friendly error message with root cause
                     const errorMsg = getUserFriendlyError(part.error);
-                    yield { type: 'text-delta', text: `\n\n${errorMsg}\n\n` };
+                    const rootCause = part.error instanceof Error ? part.error.message : String(part.error);
+                    yield { type: 'text-delta', text: `\n\n${errorMsg}\n\n_Root cause: ${rootCause}_\n\n` };
                 } else if (part.type === 'finish') {
                     console.log('[Agent] Finish reason:', part.finishReason);
                     if (reasoningText) {
@@ -260,17 +291,29 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
         } catch (streamError) {
             console.error('[Agent] Error in stream:', streamError);
             const errorMsg = getUserFriendlyError(streamError);
-            yield { type: 'text-delta', text: `\n\n${errorMsg}\n\n` };
+            const rootCause = streamError instanceof Error ? streamError.message : String(streamError);
+            yield { type: 'text-delta', text: `\n\n${errorMsg}\n\n_Root cause: ${rootCause}_\n\n` };
         }
 
         console.log('[Agent] Stream complete. Total characters:', charCount);
+
+        // Send updated memory state back to client
+        // Only send if memory tool was used and state has changed
+        if (activity.localTools.includes('memory')) {
+            console.log('[Agent] Sending memory update:', Object.keys(memoryState));
+            yield {
+                type: 'memory-update',
+                memoryState,
+            };
+        }
 
         // Signal completion (keep MCP connections alive for reuse)
         yield { type: 'done' };
     } catch (error) {
         console.error('[Agent] Error in runAgentStream:', error);
         const errorMsg = getUserFriendlyError(error);
-        yield { type: 'text-delta', text: `\n\n${errorMsg}\n\n` };
+        const rootCause = error instanceof Error ? error.message : String(error);
+        yield { type: 'text-delta', text: `\n\n${errorMsg}\n\n_Root cause: ${rootCause}_\n\n` };
         yield { type: 'done' };
     }
 }

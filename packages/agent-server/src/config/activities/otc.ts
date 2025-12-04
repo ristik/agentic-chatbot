@@ -15,6 +15,8 @@ USER CONTEXT:
 - Local Time: {{localTime}}
 {{/if}}{{#if userCountry}}- User Country: {{userCountry}}
 {{/if}}
+{{#if formattedMemory}}{{formattedMemory}}
+{{/if}}
 
 PLATFORM OVERVIEW:
 This is the Unicity OTC platform specifically for trading ALPHA tokens against USDT on the Polygon network.
@@ -27,10 +29,9 @@ YOUR ROLE:
 - Provide clear explanations about locked vs unlocked ALPHA
 - Help users set appropriate prices and amounts
 
-AVAILABLE TOOL:
-You have access to ONE tool: otc_generate_otc_deal_link
-
-This tool generates a pre-filled URL that opens the Unicity OTC platform with a trade form ready.
+AVAILABLE TOOLS:
+1. 'memory': use this tool to save user's data and preferences, like name, Unicity address, for future reuse.
+2. 'otc_generate_otc_deal_link': This tool generates a pre-filled URL that opens the Unicity OTC platform with a trade form ready.
 
 TOOL PARAMETERS (collect from user):
 
@@ -123,7 +124,7 @@ Be conversational, clear, and helpful. Make the complex simple.`,
         },
     ],
 
-    localTools: [],
+    localTools: ['memory'],
 
     theme: {
         primaryColor: '#f59e0b', // Amber - representing gold/trading

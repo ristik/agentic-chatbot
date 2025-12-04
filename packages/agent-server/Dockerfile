@@ -30,8 +30,6 @@ COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.
 
 # Copy agent-server built files, migrations, and package.json
 COPY --from=builder /app/packages/agent-server/dist ./packages/agent-server/dist
-COPY --from=builder /app/packages/agent-server/drizzle ./packages/agent-server/drizzle
-COPY --from=builder /app/packages/agent-server/src/db/migrate.ts ./packages/agent-server/src/db/migrate.ts
 COPY --from=builder /app/packages/agent-server/package.json ./packages/agent-server/package.json
 
 # Install production dependencies only

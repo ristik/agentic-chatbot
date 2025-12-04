@@ -27,6 +27,10 @@ export const ChatMessageSchema = z.object({
 
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
+// Memory state stored in browser localStorage
+export const MemoryStateSchema = z.record(z.string(), z.any());
+export type MemoryState = z.infer<typeof MemoryStateSchema>;
+
 export const ChatRequestSchema = z.object({
     activityId: z.string(),
     userId: z.string(),
@@ -36,6 +40,7 @@ export const ChatRequestSchema = z.object({
         timezone: z.string().optional(),
         locale: z.string().optional(),
     }).optional(),
+    memoryState: MemoryStateSchema.optional(), // Client's localStorage data
 });
 
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;

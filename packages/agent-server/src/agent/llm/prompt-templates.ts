@@ -22,6 +22,9 @@ export interface TemplateContext {
     userLanguage?: string;
     userRegion?: string;
     localTime?: string;
+
+    // Memory state (formatted for prompt injection)
+    formattedMemory?: string;
 }
 
 /**
@@ -87,7 +90,8 @@ export function buildTemplateContext(
     userIp?: string,
     userCountry?: string,
     userTimezone?: string,
-    userLocale?: string
+    userLocale?: string,
+    formattedMemory?: string
 ): TemplateContext {
     const now = new Date();
     const serverTime = now.toISOString();
@@ -123,6 +127,11 @@ export function buildTemplateContext(
         const parts = userLocale.split('-');
         if (parts.length >= 1) context.userLanguage = parts[0];
         if (parts.length >= 2) context.userRegion = parts[1];
+    }
+
+    // Add formatted memory state if available
+    if (formattedMemory) {
+        context.formattedMemory = formattedMemory;
     }
 
     return context;

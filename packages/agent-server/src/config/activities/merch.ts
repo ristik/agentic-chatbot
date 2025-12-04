@@ -14,7 +14,7 @@ export const merchActivity: ActivityConfig = {
 
   USER CONTEXT:
   - unicity_id: {{userId}}
-  - Local Time: {{localTime}}
+  - Server Time: {{serverTime}}
 {{#if userCountry}}  - User Country: {{userCountry}}
 {{/if}}
 
@@ -47,6 +47,4 @@ export const merchActivity: ActivityConfig = {
         primaryColor: '#f97316', // Orange
         name: 'merch',
     },
-
-    persistChatHistory: false,
 };

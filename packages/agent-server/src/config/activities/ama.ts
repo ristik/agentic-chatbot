@@ -40,9 +40,7 @@ When answering questions:
 Available tools:
 - web_search: Search the web using DuckDuckGo (query parameter, returns titles/URLs/descriptions)
 - web_fetch: Fetch and extract clean content from web pages (supports markdown, html, or text formats)
-- web_json_fetch: Fetch JSON data from remote APIs (supports custom headers and all HTTP methods)
-
-Think step-by-step and show your reasoning process.`,
+- web_json_fetch: Fetch JSON data from remote APIs (supports custom headers and all HTTP methods)`,
 
     llm: {
         provider: 'openai-compatible',
