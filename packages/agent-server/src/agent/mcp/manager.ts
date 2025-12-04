@@ -128,12 +128,10 @@ export class McpManager {
                                 _meta: meta,
                             });
 
-                            // CRITICAL: Check for errors in result
                             if (result.isError) {
                                 console.error(`[MCP] Tool execution error: ${mcpTool.name}`);
                                 console.error(`[MCP] Error content:`, JSON.stringify(result.content, null, 2));
 
-                                // Extract error message if available
                                 const errorMsg = Array.isArray(result.content)
                                     ? result.content.map(c => (c as any).text || c).join('\n')
                                     : JSON.stringify(result.content);
@@ -143,7 +141,6 @@ export class McpManager {
 
                             console.log(`[MCP] Tool ${mcpTool.name} completed successfully`);
 
-                            // Process result content to handle images
                             // If we find base64 images, store them and replace with URL
                             const content = result.content as any[];
                             const processedContent = content.map((item: any) => {
@@ -156,8 +153,7 @@ export class McpManager {
                                     console.log(`[MCP] Stored image ${imageId}, replacing with URL: ${imageUrl}`);
 
                                     // Return as text so LLM sees the URL
-                                    // We use markdown image syntax so frontend can potentially render it if it supports markdown images
-                                    // Or just plain URL if we want LLM to output it as a link
+                                    // We use markdown image syntax
                                     return {
                                         type: 'text',
                                         text: `![Image](${imageUrl})`
@@ -166,9 +162,20 @@ export class McpManager {
                                 return item;
                             });
 
-                            // Debug: Log MCP tool response
                             if (process.env.DEBUG_MCP === 'true') {
                                 console.log(`[MCP Debug] Result:`, JSON.stringify(processedContent, null, 2).substring(0, 500));
+                            }
+
+                            // Enforce payload size limit
+                            const payloadSize = JSON.stringify(processedContent).length;
+                            const MAX_PAYLOAD_SIZE = 50 * 1024; // 50kb
+
+                            if (payloadSize > MAX_PAYLOAD_SIZE) {
+                                console.error(`[MCP] Tool ${mcpTool.name} returned too much data: ${payloadSize} bytes (limit: ${MAX_PAYLOAD_SIZE})`);
+                                throw new Error(
+                                    `_MCP tool_ '${mcpTool.name}' _returned too much data (${Math.round(payloadSize / 1024)}kb). ` +
+                                    `Limit is 50kb. Please refine your query or ask the tool to return less data._`
+                                );
                             }
 
                             return processedContent;
@@ -186,8 +193,7 @@ export class McpManager {
     }
 
     private jsonSchemaToZod(schema: any): z.ZodType {
-        // Simplified JSON Schema to Zod conversion
-        // In production, use a library like zod-to-json-schema (reversed)
+        // JSON Schema to Zod conversion. Consider using a library like zod-to-json-schema (reversed)
         if (!schema || schema.type !== 'object') {
             return z.object({}).passthrough();
         }
