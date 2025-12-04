@@ -38,7 +38,7 @@ A modular, agentic chatbot platform built with React, Node.js, and the Model Con
 ### Key Technologies
 
 - **Frontend**: React + TypeScript, Vite, Tailwind CSS, Zustand (state management)
-- **Backend**: Hono (web framework), Vercel AI SDK, MCP SDK, Drizzle ORM (PostgreSQL)
+- **Backend**: Hono (web framework), Vercel AI SDK, MCP SDK
 - **LLM Providers**: Google Gemini, OpenAI-compatible APIs (local or remote)
 - **MCP**: Model Context Protocol for modular tool servers
 

@@ -17,6 +17,8 @@ export const merchActivity: ActivityConfig = {
   - Server Time: {{serverTime}}
 {{#if userCountry}}  - User Country: {{userCountry}}
 {{/if}}
+{{#if formattedMemory}}{{formattedMemory}}
+{{/if}}
 
   Important guidelines:
   - Users need a 'unicity_id' parameter to place orders - ask for it if not provided by user context

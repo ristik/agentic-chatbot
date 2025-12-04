@@ -49,15 +49,21 @@ export class McpManager {
 
     private async connectSingle(config: McpServerConfig): Promise<void> {
         try {
+            console.log(`[MCP] Connecting to server: ${config.name} at ${config.url}`);
             const client = new Client({ name: 'agent-server', version: '1.0.0' });
             const transport = new StreamableHTTPClientTransport(new URL(config.url));
 
             await client.connect(transport);
             this.connections.set(config.name, { client, config });
-            console.log(`[MCP] Connected to server: ${config.name}`);
+            console.log(`[MCP] Successfully connected to server: ${config.name}`);
         } catch (error) {
-            console.error(`[MCP] Failed to connect to ${config.name}:`, error instanceof Error ? error.message : error);
-            throw error;
+            console.error(`[MCP] Failed to connect to server: ${config.name}`);
+            console.error(`[MCP] Server URL: ${config.url}`);
+            console.error(`[MCP] Error:`, error instanceof Error ? error.message : error);
+            if (error instanceof Error && error.stack) {
+                console.error(`[MCP] Stack trace:`, error.stack);
+            }
+            throw new Error(`MCP connection failed for ${config.name}: ${error instanceof Error ? error.message : error}`);
         }
     }
 
@@ -71,8 +77,15 @@ export class McpManager {
                 continue;
             }
 
-            const { tools: mcpTools } = await client.listTools();
-            console.log(`[MCP] Loading ${mcpTools.length} tools from ${serverName}`);
+            let mcpTools;
+            try {
+                const result = await client.listTools();
+                mcpTools = result.tools;
+                console.log(`[MCP] Listed ${mcpTools.length} tools from ${serverName}`);
+            } catch (error) {
+                console.error(`[MCP] Failed to list tools from ${serverName}:`, error);
+                throw error;
+            }
 
             // Debug: Log tool details if DEBUG_MCP is enabled
             if (process.env.DEBUG_MCP === 'true') {
@@ -92,6 +105,8 @@ export class McpManager {
                     description: mcpTool.description || '',
                     parameters: this.jsonSchemaToZod(mcpTool.inputSchema),
                     execute: async (args) => {
+                        console.log(`[MCP] Executing tool: ${mcpTool.name} on server: ${serverName}`);
+
                         // Pass user metadata to MCP servers for context-aware features
                         const meta = context ? {
                             userId: context.userId,
@@ -99,29 +114,45 @@ export class McpManager {
                             userCountry: context.userCountry,
                         } : undefined;
 
-                        // Debug: Log MCP tool call
+                        // Debug: Log MCP tool call details
                         if (process.env.DEBUG_MCP === 'true') {
-                            console.log(`[MCP Debug] Calling tool: ${serverName}_${mcpTool.name}`);
-                            console.log(`[MCP Debug]   Arguments:`, JSON.stringify(args, null, 2));
+                            console.log(`[MCP Debug] Tool args:`, JSON.stringify(args, null, 2));
                             console.log(`[MCP Debug]   Metadata:`, JSON.stringify(meta, null, 2));
                         }
 
-                        const result = await client.callTool({
-                            name: mcpTool.name,
-                            arguments: args,
-                            _meta: meta,
-                        });
+                        try {
+                            const result = await client.callTool({
+                                name: mcpTool.name,
+                                arguments: args,
+                                _meta: meta,
+                            });
 
-                        // Debug: Log MCP tool response
-                        if (process.env.DEBUG_MCP === 'true') {
-                            console.log(`[MCP Debug] Response from ${serverName}_${mcpTool.name}:`);
-                            console.log(`[MCP Debug]   Content:`, JSON.stringify(result.content, null, 2));
+                            // CRITICAL: Check for errors in result
                             if (result.isError) {
-                                console.log(`[MCP Debug]   Error: true`);
-                            }
-                        }
+                                console.error(`[MCP] Tool execution error: ${mcpTool.name}`);
+                                console.error(`[MCP] Error content:`, JSON.stringify(result.content, null, 2));
 
-                        return result.content;
+                                // Extract error message if available
+                                const errorMsg = Array.isArray(result.content)
+                                    ? result.content.map(c => (c as any).text || c).join('\n')
+                                    : JSON.stringify(result.content);
+
+                                throw new Error(`MCP tool ${mcpTool.name} failed: ${errorMsg}`);
+                            }
+
+                            console.log(`[MCP] Tool ${mcpTool.name} completed successfully`);
+
+                            // Debug: Log MCP tool response
+                            if (process.env.DEBUG_MCP === 'true') {
+                                console.log(`[MCP Debug] Result:`, JSON.stringify(result.content, null, 2).substring(0, 500));
+                            }
+
+                            return result.content;
+                        } catch (error) {
+                            console.error(`[MCP] Exception during tool execution: ${mcpTool.name}`);
+                            console.error(`[MCP] Error:`, error);
+                            throw error;
+                        }
                     },
                 });
             }
