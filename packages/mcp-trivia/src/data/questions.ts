@@ -245,12 +245,6 @@ const questionData: QuestionSource[] = [
     },
     {
         category: 'Using Unicity',
-        question: 'In the "Carpatree" case study, what growth was achieved using Unicity?',
-        correctAnswer: '21.6% growth in returning customers',
-        incorrectAnswers: ['Zero growth', 'The app crashed', '50% user loss']
-    },
-    {
-        category: 'Using Unicity',
         question: 'How does Unicity handle transaction fees for developers?',
         correctAnswer: 'Likely a subscription model based on bands',
         incorrectAnswers: ['High gas fees per user', 'A percentage of all profits', 'It is strictly pay-per-click']
