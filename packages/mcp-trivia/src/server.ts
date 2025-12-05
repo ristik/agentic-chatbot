@@ -26,6 +26,7 @@ export interface TriviaServerOptions {
 export interface ActiveQuestion {
     question: TriviaQuestion;
     shuffledOptions: string[];
+    createdAt: number;  // Unix timestamp in milliseconds
 }
 
 export interface TriviaServerState {
@@ -92,6 +93,59 @@ export function createTriviaServer(options: TriviaServerOptions = {}): { server:
         scores: new Map(),
     };
 
+    /**
+     * Normalize user ID to prevent mismatches like "@alice" vs "alice"
+     * @param rawId - Raw user ID from tool call
+     * @returns Normalized user ID (lowercase, trimmed, @ prefix removed)
+     */
+    function normalizeUserId(rawId: string): string {
+        return rawId
+            .toLowerCase()
+            .trim()
+            .replace(/^@+/, '');  // Remove leading @ symbols
+    }
+
+    /**
+     * Structured logger for trivia state operations
+     */
+    function logStateOperation(
+        operation: 'get_question' | 'check_answer' | 'get_score',
+        userId: string,
+        details: Record<string, any>
+    ) {
+        const timestamp = new Date().toISOString();
+        const logEntry = {
+            timestamp,
+            operation,
+            userId,
+            stateSize: {
+                questions: state.currentQuestions.size,
+                scores: state.scores.size,
+            },
+            ...details,
+        };
+        console.log(`[Trivia State] ${JSON.stringify(logEntry)}`);
+    }
+
+    function cleanupExpiredQuestions() {
+        const now = Date.now();
+        const EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+        let cleaned = 0;
+
+        for (const [userId, activeQ] of state.currentQuestions.entries()) {
+            if (now - activeQ.createdAt > EXPIRY_MS) {
+                state.currentQuestions.delete(userId);
+                cleaned++;
+                console.log(`[Trivia] Expired question for user: ${userId} (age: ${Math.round((now - activeQ.createdAt) / 1000)}s)`);
+            }
+        }
+
+        if (cleaned > 0) {
+            console.log(`[Trivia] Cleanup: removed ${cleaned} expired question(s)`);
+        }
+    }
+    setInterval(cleanupExpiredQuestions, 5 * 60 * 1000);
+
     // Tool: Check access (day pass status)
     server.tool(
         'check_access',
@@ -136,14 +190,20 @@ export function createTriviaServer(options: TriviaServerOptions = {}): { server:
         'get_question',
         'Get a random trivia question, optionally filtered by category',
         {
-            unicity_id: z.string().optional().describe("User's Unicity ID (required when payment is enabled)"),
+            unicity_id: z.string().min(1).describe("User's Unicity ID (REQUIRED)"),
             category: z.string().optional().describe('Category to filter by'),
         },
         async ({ unicity_id, category }, extra) => {
-            // Determine user ID
-            const userId = unicity_id || (extra as any)?.meta?.userId || 'anonymous';
+            // Normalize and determine user ID
+            const userId = normalizeUserId(unicity_id);
+            console.log(`[Trivia] get_question - userId: "${userId}" (raw: "${unicity_id}")`);
 
-            console.log("Getting a new question: UserID: '" + userId + "'");
+            // Log state operation
+            logStateOperation('get_question', userId, {
+                category: category || 'random',
+                hasExistingQuestion: state.currentQuestions.has(userId),
+                currentScore: state.scores.get(userId) || 0,
+            });
 
             // Check payment if enabled
             if (paymentEnabled && paymentTracker && nostrService && config) {
@@ -240,7 +300,11 @@ export function createTriviaServer(options: TriviaServerOptions = {}): { server:
 
             const question = filtered[Math.floor(random() * filtered.length)];
             const shuffledOptions = shuffleArray([question.correctAnswer, ...question.incorrectAnswers], random);
-            state.currentQuestions.set(userId, { question, shuffledOptions });
+            state.currentQuestions.set(userId, {
+                question,
+                shuffledOptions,
+                createdAt: Date.now(),
+            });
 
             return {
                 content: [{
@@ -318,18 +382,29 @@ export function createTriviaServer(options: TriviaServerOptions = {}): { server:
         'check_answer',
         'Check if the provided answer is correct for the current question',
         {
-            unicity_id: z.string().optional().describe("User's Unicity ID"),
+            unicity_id: z.string().min(1).describe("User's Unicity ID (REQUIRED)"),
             answer: z.string().describe('The user\'s answer (text or letter a/b/c/d)'),
         },
         async ({ unicity_id, answer }, extra) => {
-            const userId = unicity_id || (extra as any)?.meta?.userId || 'anonymous';
+            const userId = normalizeUserId(unicity_id);
+            console.log(`[Trivia] check_answer - userId: "${userId}" (raw: "${unicity_id}")`);
+
             const activeQuestion = state.currentQuestions.get(userId);
 
             if (!activeQuestion) {
+                logStateOperation('check_answer', userId, {
+                    error: 'no_active_question',
+                    availableUserIds: Array.from(state.currentQuestions.keys()),
+                });
                 return {
                     content: [{ type: 'text', text: JSON.stringify({ error: 'No active question. Get a question first.' }) }],
                 };
             }
+
+            logStateOperation('check_answer', userId, {
+                questionId: activeQuestion.question.id,
+                userAnswer: answer,
+            });
 
             const { question, shuffledOptions } = activeQuestion;
 
@@ -379,10 +454,17 @@ export function createTriviaServer(options: TriviaServerOptions = {}): { server:
         'get_score',
         'Get the current score for the user',
         {
-            unicity_id: z.string().optional().describe("User's Unicity ID"),
+            unicity_id: z.string().min(1).describe("User's Unicity ID (REQUIRED)"),
         },
         async ({ unicity_id }, extra) => {
-            const userId = unicity_id || (extra as any)?.meta?.userId || 'anonymous';
+            const userId = normalizeUserId(unicity_id);
+            console.log(`[Trivia] get_score - userId: "${userId}" (raw: "${unicity_id}")`);
+
+            logStateOperation('get_score', userId, {
+                score: state.scores.get(userId) || 0,
+                hasActiveQuestion: state.currentQuestions.has(userId),
+            });
+
             return {
                 content: [{
                     type: 'text',
@@ -484,7 +566,6 @@ async function main() {
 
     const port = config.port || parseInt(process.env.PORT || '3001', 10);
     const winningStreak = config.winningStreak || DEFAULT_WINNING_STREAK;
-
     console.log(`[Trivia] Winning streak set to: ${winningStreak}`);
 
     const { server } = createTriviaServer({
