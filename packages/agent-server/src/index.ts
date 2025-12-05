@@ -19,20 +19,34 @@ const corsOrigins = process.env.CORS_ORIGIN
 
 console.log('[CORS] Allowed origins:', corsOrigins);
 
-app.use('*', cors({
+// CORS for API routes (strict - requires Origin header)
+app.use('/chat/*', cors({
     origin: (origin) => {
-        console.log('[CORS] Request origin:', origin);
-        // Reject requests with no origin header for security
         if (!origin) {
-            console.log('[CORS] Rejected: No origin header');
-            return corsOrigins[0]; // Return a valid origin to avoid wildcard
+            console.log('[CORS] Rejected for /chat/: No origin header');
+            return corsOrigins[0];
         }
-        // Check if origin is in allowed list
         const allowed = corsOrigins.includes(origin);
-        console.log('[CORS] Origin allowed:', allowed);
         return allowed ? origin : corsOrigins[0];
     },
     credentials: true,
+}));
+
+app.use('/activities/*', cors({
+    origin: (origin) => {
+        if (!origin) {
+            return corsOrigins[0];
+        }
+        const allowed = corsOrigins.includes(origin);
+        return allowed ? origin : corsOrigins[0];
+    },
+    credentials: true,
+}));
+
+// allow all origins for images
+app.use('/images/*', cors({
+    origin: '*',
+    credentials: false,
 }));
 
 // Routes
