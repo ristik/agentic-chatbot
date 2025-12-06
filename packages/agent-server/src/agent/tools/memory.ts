@@ -48,7 +48,7 @@ Actions:
         parameters: z.object({
             action: z.enum(['get', 'set', 'list', 'pull']).describe('Action to perform'),
             key: z.string().optional().describe('Memory key (required for get/set)'),
-            value: z.any().optional().describe('Value to store (required for set)'),
+            value: z.union([z.string(), z.number(), z.boolean(), z.object({}).passthrough(), z.array(z.any())]).optional().describe('Value to store (required for set)'),
         }),
         execute: async ({ action, key, value }) => {
             switch (action) {
