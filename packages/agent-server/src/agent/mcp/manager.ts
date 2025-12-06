@@ -88,14 +88,55 @@ export class McpManager {
             this.connections.set(config.name, { client, config });
             console.log(`[MCP] Successfully connected to server: ${config.name}`);
         } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+
+            // Handle "Server already initialized" error - try to disconnect and reconnect
+            if (errorMsg.includes('Server already initialized') || errorMsg.includes('already initialized')) {
+                console.warn(`[MCP] Server ${config.name} already initialized, attempting to create new session...`);
+
+                try {
+                    // Create a new client with a unique session ID
+                    const sessionId = `agent-server-${Date.now()}`;
+                    const client = new Client({ name: sessionId, version: '1.0.0' });
+                    const transport = new StreamableHTTPClientTransport(new URL(config.url));
+
+                    await client.connect(transport);
+                    this.connections.set(config.name, { client, config });
+                    console.log(`[MCP] Successfully reconnected to server: ${config.name} with new session`);
+                    return;
+                } catch (retryError) {
+                    console.error(`[MCP] Retry failed for ${config.name}:`, retryError);
+                    throw new Error(`MCP connection failed for ${config.name}: Server already initialized. Please restart the MCP server.`);
+                }
+            }
+
             console.error(`[MCP] Failed to connect to server: ${config.name}`);
             console.error(`[MCP] Server URL: ${config.url}`);
-            console.error(`[MCP] Error:`, error instanceof Error ? error.message : error);
+            console.error(`[MCP] Error:`, errorMsg);
             if (error instanceof Error && error.stack) {
                 console.error(`[MCP] Stack trace:`, error.stack);
             }
-            throw new Error(`MCP connection failed for ${config.name}: ${error instanceof Error ? error.message : error}`);
+            throw new Error(`MCP connection failed for ${config.name}: ${errorMsg}`);
         }
+    }
+
+    /**
+     * Disconnect from all MCP servers
+     */
+    async disconnect(): Promise<void> {
+        console.log(`[MCP] Disconnecting from ${this.connections.size} server(s)...`);
+
+        for (const [name, conn] of this.connections.entries()) {
+            try {
+                await conn.client.close();
+                console.log(`[MCP] Disconnected from ${name}`);
+            } catch (error) {
+                console.error(`[MCP] Error disconnecting from ${name}:`, error);
+            }
+        }
+
+        this.connections.clear();
+        this.connecting.clear();
     }
 
     async getTools(serverNames: string[], context?: ToolContext): Promise<Record<string, CoreTool>> {
@@ -285,14 +326,6 @@ export class McpManager {
         }
 
         return z.object(shape);
-    }
-
-    async disconnect(): Promise<void> {
-        for (const [name, { client }] of this.connections) {
-            await client.close();
-            console.log(`Disconnected from MCP server: ${name}`);
-        }
-        this.connections.clear();
     }
 
     isConnected(serverName: string): boolean {

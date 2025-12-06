@@ -37,6 +37,25 @@ export function formatMemoryForPrompt(memoryState: Record<string, any>, userId: 
 export function createMemoryTool(ctx: ToolContext) {
     const { userId, activityId, memoryState } = ctx;
 
+    // Gemini requires array items to be explicitly typed (no z.any())
+    // Support arrays of primitives and objects
+    const arrayValueSchema = z.array(
+        z.union([
+            z.string(),
+            z.number(),
+            z.boolean(),
+            z.record(z.string(), z.unknown()),
+        ])
+    );
+
+    const memoryValueSchema = z.union([
+        z.string(),
+        z.number(),
+        z.boolean(),
+        z.record(z.string(), z.unknown()),
+        arrayValueSchema,
+    ]);
+
     return tool({
         description: `Store or retrieve user-specific information for personalization. Use this to remember user preferences, past choices, etc. across the sessions.
 
@@ -48,7 +67,7 @@ Actions:
         parameters: z.object({
             action: z.enum(['get', 'set', 'list', 'pull']).describe('Action to perform'),
             key: z.string().optional().describe('Memory key (required for get/set)'),
-            value: z.union([z.string(), z.number(), z.boolean(), z.object({}).passthrough(), z.array(z.any())]).optional().describe('Value to store (required for set)'),
+            value: memoryValueSchema.optional().describe('Value to store (required for set)'),
         }),
         execute: async ({ action, key, value }) => {
             switch (action) {
