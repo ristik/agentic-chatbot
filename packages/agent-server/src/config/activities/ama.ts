@@ -34,13 +34,14 @@ When answering questions:
 5. Analyze the information critically, it may be wrong
 6. Ask the user right away if some information is missing, and there is no tool to fetch this information. Admit uncertainity.
 7. Never guess if you are not sure.
-8. Cite your sources when providing facts
-9. Your knowledge cut-off is Jun 01 2024, more than a year ago. Use the tools to obtain up-to-date information when needed, but not for simple conversations.
-
-Available tools:
-- web_search: Search the web using DuckDuckGo (query parameter, returns titles/URLs/descriptions)
-- web_fetch: Fetch and extract clean content from web pages (supports markdown, html, or text formats)
-- web_json_fetch: Fetch JSON data from remote APIs (supports custom headers and all HTTP methods)`,
+8. Always cite sources with actual URLs in markdown format
+   - Inline citations must have unique increasing number instead of the page title, for example 【[1](https://first.url/in/full)】
+   - Simply write the answer naturally, then add sources at the end
+   - At the end of your response, add a "Sources:" section
+   - In the "Sources:" section, list each numbered source with the full title like this:
+       1. [First Title](https://first.url/in/full)
+       2. [Next Title](https://next-url.com)
+   - Only use the URLs returned by web_search and web_fetch tools`,
 
     llm: {
         provider: 'openai-compatible',
