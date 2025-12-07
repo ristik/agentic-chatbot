@@ -11,7 +11,7 @@ interface QuestionSource {
 }
 
 export const categories = ['Basics & Vision', 'Under the Hood', 'Security & Privacy',
-    'Using Unicity', 'Building & Ecosystem', 'Science'];
+    'Using Unicity', 'Building & Ecosystem', 'Science', 'Tokenomics', 'About Us'];
 
 const questionData: QuestionSource[] = [
     // --- CATEGORY 1: BASICS & VISION ---
@@ -928,7 +928,181 @@ const questionData: QuestionSource[] = [
             'A hash of the private key',
             'The random salt used in f'
         ]
-    }
+    },
+
+    // About Us
+    {
+        category: 'About Us',
+        question: 'Who is the inventor of the Unicity Protocol?',
+        correctAnswer: 'Vladimir Rogojin',
+        incorrectAnswers: [
+            'Dmitry Sokolov',
+            'Marcus Thorne',
+            'Emily Carter'
+        ]
+    },
+    {
+        category: 'About Us',
+        question: 'Who is the CEO of Unicity Labs?',
+        correctAnswer: 'Mike Gault',
+        incorrectAnswers: [
+            'Siobhan Gallagher',
+            'Niamh Doyle',
+            'Arthur Caldwell'
+        ]
+    },
+
+    // Questions from FAQ
+    {
+      category: 'Basics & Vision',
+      question: 'When comparing Unicity to typical L2 rollups, which of the following is closest to how Unicity assets behave?',
+      correctAnswer: 'Each asset behaves like its own portable L2 that can move between users and apps',
+      incorrectAnswers: [
+        'All assets share a single centralized sequencer controlled by one operator',
+        'Assets are stored on an aggressively sharded L1',
+        'Assets are recreated from scratch every time they cross a bridge'
+      ]
+    },
+   {
+     category: 'Under the Hood',
+     question: 'Why does the Unicity PoW chain deliberately avoid including user transactions?',
+     correctAnswer: 'To minimize on-chain state so that any maximalist user can easily verify the chain from genesis',
+     incorrectAnswers: [
+       'Because the Aggregation Layer can scale to Merkle proofs for user data',
+       'Because tokens are intended to be custodial',
+       'Because Unicity relies on external L2s to record all end-user activity'
+     ]
+   },
+  {
+    category: 'Under the Hood',
+    question: 'What is the role of “agents” in the Unicity architecture?',
+    correctAnswer: 'They act as off-chain application runtimes (like smart contracts) that coordinate multi-asset logic such as DEXs or games',
+    incorrectAnswers: [
+      'They are centralized servers that whitelist user wallets using KYC',
+      'They are special validator nodes that propose PoW blocks',
+      'They are browser plugins that sign basic transfers orders using LLM workflows'
+    ]
+  },
+  {
+    category: 'Using Unicity',
+    question: 'Which communication channels can be used to actually deliver an updated token from payer to payee?',
+    correctAnswer: 'Any channel the two parties agree on, such as email, messaging apps, NFC or QR codes',
+    incorrectAnswers: [
+      'Only transactions embedded into PoW block coinbase outputs',
+      'Only a proprietary Unicity-branded messaging network',
+      'Only direct TCP connections to the Consensus Layer nodes'
+    ]
+  },
+  {
+    category: 'Using Unicity',
+    question: 'In a typical online payment, what does the payer’s wallet do before sending the token to the recipient?',
+    correctAnswer: 'Posts a state transition request to the Aggregation Layer and appends the returned inclusion proof to the token history',
+    incorrectAnswers: [
+      'Asks the PoW miners to include the full token JSON in the next block',
+      'Asks the PoW miners to include a hash of the token JSON in the next block',
+      'Submits the payment to a sharded and decentralised validator consensus mechanism to validate and establish the order for transactions'
+    ]
+  },
+  {
+    category: 'Using Unicity',
+    question: 'How does Unicity envision developers paying for access to the Proof Aggregation Layer instead of per-transaction gas fees?',
+    correctAnswer: 'Through a subscription model where native tokens are burned to unlock a certain request quota',
+    incorrectAnswers: [
+      'By bidding in a fee marketplace for transaction inclusion into the next block',
+      'By locking a fixed amount of tokens into a long-term staking pool',
+      'By paying monthly invoices in fiat to a service provider of their choice'
+    ]
+  },
+  {
+    category: 'Using Unicity',
+    question: 'What is the purpose of a Unicity ID from a user-experience perspective?',
+    correctAnswer: 'They map human-meaningful identifiers to technical addresses or app-specific values in a self-authenticating way',
+    incorrectAnswers: [
+      'They serve mostly as vanity NFTs that users can sell and trade on decentralised markets',
+      'They are vanity public keys with limited length that, when encoded in ASCII, spell out a human-readable name',
+      'They are wrapped DNS (Domain Name System) tokens referring to host names, registered on the Unicity blockchain'
+    ]
+  },
+  {
+    category: 'Building & Ecosystem',
+    question: 'Which SDK would a developer primarily use to mint tokens and perform basic state transitions in Unicity?',
+    correctAnswer: 'The State Transition SDK',
+    incorrectAnswers: [
+      'The Unicity Nostr SDK',
+      'The Unicity Token API',
+      'No SDK is needed'
+    ]
+  },
+  {
+    category: 'Science',
+    question: 'Which scalability assumption does Unicity explicitly reject from traditional blockchain designs?',
+    correctAnswer: 'That everyone must be able to validate all transactions in a globally ordered shared state',
+    incorrectAnswers: [
+      'That sharding requires also sharding the validator set',
+      'That Merkle trees can be used to compress transaction history',
+      'That light clients can safely verify any blockchain header'
+    ]
+  },
+  {
+    category: 'Science',
+    question: 'What is the main role of zero-knowledge proofs in Unicity’s design?',
+    correctAnswer: 'To compress token histories and bridge burn events, rather than sitting in the latency-critical transaction path',
+    incorrectAnswers: [
+      'To generate a ZK-proof for every individual transfer before a wallet can show a balance, rather than asking various nodes to verify the transaction themselves',
+      'To privately compute PoW difficulty targets inside trusted hardware',
+      'To obfuscate miners’ and users’ public keys inside the blockchain'
+    ]
+  },
+  {
+    category: 'Using Unicity',
+    question: 'According to the alpha-miner README, which configuration change can roughly double hashrate when benchmarking on supported hardware?',
+    correctAnswer: 'Enabling large memory pages with the --largepages option',
+    incorrectAnswers: [
+      'Switching from solo mining to pool mining over Stratum',
+      'Running the miner inside the official Docker image instead of on bare metal',
+      'Compiling alpha-miner with a statically linked modern cryptography library'
+    ]
+  },
+  {
+    category: 'Tokenomics',
+    question: 'When mapping the Alpha mining rewards to the newer 10 billion UCT supply, what is the announced conversion factor per alpha token?',
+    correctAnswer: 'Approximately 476× (about 10,000,000,000 / 21,000,000)',
+    incorrectAnswers: [
+      'Approximately 95× (about 2,000,000,000 / 21,000,000)',
+      'Approximately 210× (about 4,410,000,000 / 21,000,000)',
+      'Approximately 1,000× (a simple 1:1000 redenomination)'
+    ]
+  },
+  {
+    category: 'Tokenomics',
+    question: 'If a miner holds 1,000 alpha tokens at the time of conversion, roughly how many UCT tokens should they expect on the new chain, using the announced alpha→UCT conversion ratio?',
+    correctAnswer: 'About 476.190 UCT',
+    incorrectAnswers: [
+      'About 10 000 UCT',
+      'About 21 000 UCT',
+      'About 4 760 000 UCT'
+    ]
+  },
+  {
+    category: 'Under the Hood',
+    question: 'How does Unicity’s long-term inflation schedule aim to keep mining incentives sustainable without creating a “security cliff”?',
+    correctAnswer: 'By starting with around 5% inflation and then stabilizing at a 2% tail inflation that continues indefinitely',
+    incorrectAnswers: [
+      'By front-loading roughly 20% inflation in year one and then freezing the supply forever',
+      'By burning all block rewards after 5 years so that no new tokens are ever minted',
+      'By raising transaction fees over time according to a predetermined schedule'
+    ]
+  },
+  {
+    category: 'Tokenomics',
+    question: 'Approximately what share of the total UCT supply is planned to be in circulation when the Unicity mainnet launches?',
+    correctAnswer: 'Around 7% of the total supply',
+    incorrectAnswers: [
+      'Around 25% of the total supply',
+      'Around 50% of the total supply',
+      'Over 1% of the total supply'
+    ]
+  }
 ];
 
 export const questions: TriviaQuestion[] = questionData.map((q, index) => ({
