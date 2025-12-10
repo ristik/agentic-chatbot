@@ -31,6 +31,8 @@ export const ActivityConfigSchema = z.object({
     // Message history limits (0 = no limit)
     maxHistoryBytes: z.number().default(30000).optional(), // Default ~7-8k tokens
     maxHistoryMessages: z.number().default(0).optional(), // 0 = no message count limit, 1 = only latest, etc.
+    // Reference processing: converts 【ref:id】 markers to clickable links using tool result URLs
+    processReferences: z.boolean().default(false).optional(),
 });
 
 export type ActivityConfig = z.infer<typeof ActivityConfigSchema>;

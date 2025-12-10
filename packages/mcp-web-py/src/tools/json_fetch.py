@@ -3,6 +3,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field, HttpUrl
 import requests
 import time
+import uuid
 
 
 class JsonFetchInput(BaseModel):
@@ -71,7 +72,11 @@ async def json_fetch_tool(input: JsonFetchInput) -> dict:
             # Not JSON, return raw text
             data = {"_raw": response.text, "_note": "Response was not valid JSON"}
 
+        # Generate unique ID for this fetch
+        fetch_id = f"json_{str(uuid.uuid4())[:8]}"
+
         return {
+            "id": fetch_id,
             "url": str(input.url),
             "status_code": response.status_code,
             "status_text": response.reason,

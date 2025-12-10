@@ -51,7 +51,7 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Region code (us-en, uk-en, wt-wt for worldwide)",
                         "enum": ["us-en", "uk-en", "wt-wt"],
-                        "default": "wt-wt"
+                        "default": "us-en"
                     },
                     "backend": {
                         "type": "string",
@@ -83,8 +83,8 @@ async def list_tools() -> list[Tool]:
                         "type": "integer",
                         "description": "Maximum content length in characters",
                         "minimum": 1,
-                        "maximum": 100000,
-                        "default": 50000
+                        "maximum": 500000,
+                        "default": 100000
                     }
                 },
                 "required": ["url"]
@@ -138,7 +138,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             input_data = FetchInput(
                 url=arguments["url"],
                 format=arguments.get("format", "markdown"),
-                max_length=arguments.get("max_length", 50000)
+                max_length=arguments.get("max_length", 100000)
             )
             result = await fetch_tool(input_data)
             return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]

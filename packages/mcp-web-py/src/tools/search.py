@@ -39,6 +39,7 @@ async def search_tool(input: SearchInput) -> dict:
             "query": input.query,
             "results": [
                 {
+                    "id": f"search_{idx + 1}",
                     "title": r.get("title", ""),
                     "url": r.get("href", ""),
                     "description": r.get("body", ""),

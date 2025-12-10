@@ -4,6 +4,7 @@ import { processTemplate, buildTemplateContext } from './llm/prompt-templates.js
 import { createMemoryTool, formatMemoryForPrompt, type ToolContext } from './tools/memory.js';
 import { globalMcpManager } from './mcp/manager.js';
 import type { ActivityConfig, ChatMessage } from '@agentic/shared';
+import { processChunk, resetReferenceTracking, type ToolResult } from './references.js';
 
 // Configuration for tool retry behavior
 const ENABLE_TOOL_RETRY = process.env.ENABLE_TOOL_RETRY !== 'false'; // Default: enabled
@@ -351,6 +352,15 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
         // Track tool call history to prevent infinite loops (if enabled)
         const toolCallHistory: Array<{ toolName: string; args: string }> = [];
 
+        // Track tool results for reference processing
+        const shouldProcessReferences = activity.processReferences === true;
+        const toolResultsMap = new Map<string, ToolResult>();
+
+        // Reset reference tracking for this message
+        if (shouldProcessReferences) {
+            resetReferenceTracking();
+        }
+
         // Run the agent loop with streaming
         const result = streamText({
             model,
@@ -405,6 +415,55 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
                         if (resultStr.includes('Error executing tool') || resultStr.includes('Tool execution failed') || resultStr.includes('Error:')) {
                             console.log(`[Agent]    Tool ${tr.toolName} returned error - LLM will see this and may retry`);
                         }
+
+                        // Store tool results for reference processing
+                        if (shouldProcessReferences && tr.result) {
+                            let parsedResult: any;
+
+                            // Handle different result formats
+                            // MCP tools return: [{ type: "text", text: "{...}" }]
+                            if (Array.isArray(tr.result) && tr.result.length > 0 && tr.result[0].type === 'text') {
+                                try {
+                                    parsedResult = JSON.parse(tr.result[0].text);
+                                } catch (e) {
+                                    parsedResult = null;
+                                }
+                            } else if (typeof tr.result === 'string') {
+                                try {
+                                    parsedResult = JSON.parse(tr.result);
+                                } catch (e) {
+                                    parsedResult = null;
+                                }
+                            } else {
+                                parsedResult = tr.result;
+                            }
+
+                            if (!parsedResult) {
+                                return;
+                            }
+
+                            // Single result with ID (fetch, json_fetch)
+                            if (parsedResult.id) {
+                                toolResultsMap.set(parsedResult.id, {
+                                    id: parsedResult.id,
+                                    url: parsedResult.url,
+                                    title: parsedResult.title
+                                });
+                            }
+
+                            // Multiple results (search)
+                            if (parsedResult.results && Array.isArray(parsedResult.results)) {
+                                parsedResult.results.forEach((r: any) => {
+                                    if (r.id) {
+                                        toolResultsMap.set(r.id, {
+                                            id: r.id,
+                                            url: r.url,
+                                            title: r.title
+                                        });
+                                    }
+                                });
+                            }
+                        }
                     });
                 }
                 console.log('[Agent] Step finished. Current text length:', text.length, 'Finish reason:', finishReason || 'none');
@@ -433,7 +492,16 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
                     hasContent = true;
                     totalTextLength += part.textDelta.length;
                     charCount += part.textDelta.length;
-                    yield { type: 'text-delta', text: part.textDelta };
+
+                    // Convert reference markers to clickable links if enabled
+                    if (shouldProcessReferences) {
+                        // Convert 【ref:id】 to clickable link emoji on-the-fly
+                        const processed = processChunk(part.textDelta, toolResultsMap);
+                        yield { type: 'text-delta', text: processed };
+                    } else {
+                        // No reference processing: stream as-is
+                        yield { type: 'text-delta', text: part.textDelta };
+                    }
                 } else if (part.type === 'reasoning') {
                     // Extended thinking models emit reasoning content
                     reasoningText += part.textDelta;

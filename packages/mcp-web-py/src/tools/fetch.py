@@ -5,6 +5,7 @@ import trafilatura
 from readability import Document
 import html2text
 import requests
+import uuid
 
 
 class FetchInput(BaseModel):
@@ -137,7 +138,11 @@ async def fetch_tool(input: FetchInput) -> dict:
             content = content[:input.max_length] + "\n\n[Content truncated...]"
             print(f"[Fetch] Truncated to {input.max_length} chars")
 
+        # Generate unique ID for this fetch
+        fetch_id = f"fetch_{str(uuid.uuid4())[:8]}"
+
         return {
+            "id": fetch_id,
             "url": str(input.url),
             "title": title,
             "content": content,
