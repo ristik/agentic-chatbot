@@ -337,13 +337,13 @@ IMPORTANT INSTRUCTIONS FOR MESSAGE HANDLING:
                 if (Array.isArray(msg.content)) {
                     msg.content.forEach((part, partIdx) => {
                         if (part.type === 'text') {
-                            console.log(`  [Part ${partIdx + 1}] Text: ${part.text.substring(0, 200)}${part.text.length > 200 ? '...' : ''}`);
+                            console.log(`  [Part ${partIdx + 1}] Text: ${part.text.substring(0, 2000)}${part.text.length > 2000 ? '...' : ''}`);
                         } else {
                             console.log(`  [Part ${partIdx + 1}] Type: ${part.type}`);
                         }
                     });
                 } else {
-                    console.log(`  Content: ${typeof msg.content === 'string' ? msg.content.substring(0, 200) : JSON.stringify(msg.content).substring(0, 200)}`);
+                    console.log(`  Content: ${typeof msg.content === 'string' ? msg.content.substring(0, 2000) : JSON.stringify(msg.content).substring(0, 2000)}`);
                 }
             });
         }
