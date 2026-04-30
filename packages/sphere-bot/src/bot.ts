@@ -38,7 +38,7 @@ export class SphereBot {
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
       l1: null,
-      autoGenerate: true,
+      autoGenerate: false,
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,
       dmSince: Math.floor(Date.now() / 1000) - 86400,

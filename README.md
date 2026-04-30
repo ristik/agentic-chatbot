@@ -1,46 +1,47 @@
 # Agentic Chatbot
 
-A modular, agentic chatbot platform built with React, Node.js, and the Model Context Protocol (MCP). Features a standalone knowledge base bot that communicates via Nostr DMs.
+A pnpm monorepo of Sphere DM bots — Node.js services that own a Sphere
+blockchain wallet, listen for Nostr DMs (or post to NIP-29 group chats),
+and respond using an LLM plus tools exposed over the Model Context
+Protocol (MCP).
 
-## Architecture Overview
+## Bots
+
+| Bot | Role | Surface | LLM |
+|---|---|---|---|
+| `kbbot` | Knowledge-base assistant | DM | Google Gemini |
+| `viktor` | Anonymous research assistant | DM | OpenAI-compatible |
+| `chess-bot` | Plays chess via Stockfish | Group chat | — |
+| `unicity-l3` | Posts new aggregator block info | Group chat | — |
+
+`kbbot` and `viktor` share the `@agentic/sphere-bot` library (agent loop,
+MCP tool manager, model factory). `chess-bot` and `unicity-l3` use the
+Sphere SDK directly.
+
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       Frontend (React)                          │
-│  - Activity Selector    - Chat with streaming                   │
-│  - Markdown rendering   - Thinking/reasoning display            │
-└─────────────────┬───────────────────────────────────────────────┘
-                  │ HTTP/SSE
-┌─────────────────▼───────────────────────────────────────────────┐
-│                  Agent Server (Node.js)                          │
-│  - Activity routing     - LLM orchestration (Gemini, OpenAI)    │
-│  - Agent loop           - Local tools (memory)                  │
-│  - MCP client manager                                           │
-└─────────┬───────────┬───────────┬───────────────────────────────┘
-          │           │           │  MCP over HTTP
-┌─────────▼──┐ ┌──────▼──┐ ┌─────▼──────┐
-│ MCP Trivia │ │ MCP Web │ │  MCP RAG   │
-│            │ │         │ │            │
-│ Questions  │ │ Search  │ │ Semantic   │
-│ Scoring    │ │ Fetch   │ │ search     │
-└────────────┘ └─────┬───┘ └─────┬──────┘
-                     │           │  MCP over HTTP
-              ┌──────┴───────────┴──────┐
-              │     KBBot (Node.js)     │
-              │                         │
-              │  Sphere SDK wallet      │
-              │  Nostr DM listener      │
-              │  Gemini LLM agent       │
-              └─────────────────────────┘
+   ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌────────────┐
+   │   kbbot   │ │  viktor   │ │ chess-bot │ │ unicity-l3 │
+   │ (DM bot)  │ │ (DM bot)  │ │ (group)   │ │ (group)    │
+   └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬──────┘
+         │             │             │             │
+         │  Sphere SDK │ Sphere SDK  │ Sphere SDK  │ Sphere SDK
+         │  (Nostr DM, NIP-17, NIP-29 group chat)  │
+         ▼             ▼             ▼             ▼
+   ┌─────────────────────────────────────────────────────┐
+   │              Nostr relays (testnet/mainnet)         │
+   └─────────────────────────────────────────────────────┘
+
+         ┌─────────┐         ┌─────────┐
+   MCP   │ mcp-rag │         │ mcp-web │ ──HTTP──► searxng
+  ─────► │ (Python)│         │(Python) │           (search)
+         │ Chroma  │         │ search+ │
+         │  /rag   │         │  fetch  │
+         └─────────┘         └─────────┘
+                  ▲              ▲
+                  └──── kbbot, viktor (MCP/HTTP)
 ```
-
-### Key Technologies
-
-- **Frontend**: React + TypeScript, Vite, Tailwind CSS, Zustand
-- **Backend**: Hono, Vercel AI SDK v6, MCP SDK
-- **LLM Providers**: Google Gemini, OpenAI-compatible APIs
-- **MCP**: Model Context Protocol for modular tool servers
-- **KBBot**: Sphere SDK (Nostr DMs), standalone Node.js service
 
 ## Quick Start
 
@@ -49,6 +50,7 @@ A modular, agentic chatbot platform built with React, Node.js, and the Model Con
 - Node.js 20+
 - pnpm 8+
 - Docker & Docker Compose
+- Python 3.10+ (only if running the MCP servers outside Docker)
 
 ### Setup
 
@@ -56,151 +58,167 @@ A modular, agentic chatbot platform built with React, Node.js, and the Model Con
 git clone <repository>
 cd agentic-chatbot
 pnpm install
-cp .env.example .env
-# Edit .env with your API keys
-```
-
-### Run with Docker Compose
-
-```bash
+cp .env.example .env          # fill in API keys + bot mnemonics
 docker compose up --build
 ```
 
-### Local Development (without Docker)
+### Running a single bot in dev
 
 ```bash
-# MCP Web Server (Python)
-cd packages/mcp-web-py
-python -m venv venv && source venv/bin/activate
-pip install -e . && python -m src.server
-
-# MCP RAG Server (Python)
-cd packages/mcp-rag
-python -m venv venv && source venv/bin/activate
-pip install -e . && python -m src.server
-
-# KBBot
-cd packages/kbbot && pnpm dev
-
+pnpm --filter kbbot dev
+pnpm --filter viktor dev
+pnpm --filter chess-bot dev
+pnpm --filter unicity-l3 dev
 ```
 
-## Core Concepts
+### Python MCP servers locally
 
-### MCP Servers
-
-Standalone HTTP services that expose tools via the Model Context Protocol:
-- Built using `@modelcontextprotocol/sdk`
-- Provide tools via JSON schema
-- Run as separate Docker containers
-- Stateless or stateful (using userId from metadata)
-
-### Agent Loop
-
-The main execution flow in `agent-server/src/agent/loop.ts`:
-1. Receives user message and chat history
-2. Converts to LLM-compatible format
-3. Streams LLM response with tool calls
-4. Executes tools via MCP or local handlers
-5. Yields text deltas, reasoning, and tool-call events to frontend
-
-### KBBot
-
-A standalone knowledge base bot that participates in Sphere's DM chat:
-- Creates a Sphere wallet on first boot (persisted in `data/kbbot/`)
-- Listens for incoming Nostr DMs via Sphere SDK
-- Answers questions using Gemini LLM + RAG and web search tools
-- Sends welcome DMs to new wallet users (via `/api/notify` webhook)
-- Sends composing indicators while generating responses
-- In-memory conversation history (lost on restart)
-
-**Tool usage priority:**
-1. Search local knowledge base (RAG) — answer if sufficient
-2. Search the web — answer if snippets suffice
-3. Fetch one web page — answer from full content
-4. Force text generation if step limit reached
-
-### RAG Knowledge Base
-
-The `mcp-rag` server provides semantic search over markdown documentation:
-- Documents go in the `rag/` directory at project root
-- Index is rebuilt from scratch on every container restart
-- Uses ChromaDB for vector storage
-- Section-aware chunking preserves markdown structure with header context
-
-To update the knowledge base:
 ```bash
-# Add/edit .md files in rag/
-docker compose restart mcp-rag
+cd packages/mcp-rag && python -m venv venv && source venv/bin/activate \
+  && pip install -e . && python -m src.server
+
+cd packages/mcp-web-py && python -m venv venv && source venv/bin/activate \
+  && pip install -e . && python -m src.server
 ```
+
+## Wallet & Mnemonic Handling
+
+Each bot owns a Sphere wallet persisted under `data/<bot>/data/wallet.json`
+(bind-mounted into the container). On startup the bot calls
+`Sphere.init({ autoGenerate: false, mnemonic: ... })`:
+
+- **If `wallet.json` exists** — it's loaded and the env var is ignored.
+- **If `wallet.json` is missing** — the matching `*_MNEMONIC` env var must
+  be set, otherwise the SDK throws `"No wallet exists and no mnemonic
+  provided"` and the bot refuses to start.
+
+The mnemonic env vars are:
+
+| Bot | Mnemonic var |
+|---|---|
+| kbbot | `KBBOT_MNEMONIC` |
+| viktor | `VIKTOR_MNEMONIC` |
+| chess-bot | `CHESS_BOT_MNEMONIC` |
+| unicity-l3 | `L3_MNEMONIC` |
+
+`autoGenerate` is intentionally off so a corrupt `wallet.json` cannot
+silently cause an identity swap on restart. To bootstrap a fresh
+deployment, set the corresponding `*_MNEMONIC` once; you can leave it set
+afterwards as a recovery fallback or remove it.
+
+## Bot Data & Backup
+
+```
+data/
+├── kbbot/{data,tokens}/
+├── viktor/{data,tokens}/
+├── chess-bot/{data,tokens}/
+├── unicity-l3/{data,tokens}/
+├── mcp-rag/chromadb/
+└── searxng/
+```
+
+The `data/` directory is gitignored. Use the backup script to migrate:
+
+```bash
+./scripts/bot-backup.sh backup kbbot          # creates kbbot-backup.tar.gz
+./scripts/bot-backup.sh restore kbbot         # extracts into data/kbbot/
+```
+
+Same for `viktor`, `chess-bot`, `unicity-l3`.
 
 ## Environment Variables
 
-### Agent Server
+See `.env.example` for the full list. Highlights:
+
+### kbbot
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `GOOGLE_API_KEY` | *required* | Gemini API key |
-| `MCP_WEB_URL` | `http://mcp-web:3002/mcp` | Web MCP server URL |
-| `MCP_RAG_URL` | `http://mcp-rag:3003/mcp` | RAG MCP server URL |
-| `DEBUG_PROMPTS` | `false` | Log system prompts |
-| `DEBUG_MCP` | `false` | Log MCP tool calls |
-| `ENABLE_TOOL_RETRY` | `true` | LLM retry on tool errors |
-| `MAX_TOOL_RETRIES` | `2` | Max identical retries |
-
-### KBBot
-
-| Variable | Default | Description |
-|----------|---------|-------------|
+|---|---|---|
 | `KBBOT_LLM_API_KEY` | *required* | Gemini API key |
-| `KBBOT_LLM_MODEL` | `gemini-3-flash-preview` | LLM model name |
-| `KBBOT_LLM_BASE_URL` | — | Custom LLM endpoint URL |
-| `KBBOT_NAMETAG` | `kbbot` | Bot's nametag on Sphere |
-| `KBBOT_NETWORK` | `testnet` | Sphere network (`mainnet`/`testnet`/`dev`) |
-| `KBBOT_MAX_HISTORY_MESSAGES` | `20` | Max conversation turns per user |
-| `MCP_RAG_URL` | `http://mcp-rag:3003/mcp` | RAG MCP server URL |
-| `MCP_WEB_URL` | `http://mcp-web:3002/mcp` | Web MCP server URL |
+| `KBBOT_LLM_MODEL` | `gemini-3-flash-preview` | Model name |
+| `KBBOT_LLM_BASE_URL` | — | Optional custom endpoint |
+| `KBBOT_NAMETAG` | `kbbot` | Sphere nametag |
+| `KBBOT_NETWORK` | `testnet` | `mainnet` / `testnet` / `dev` |
+| `KBBOT_MNEMONIC` | — | Wallet mnemonic (see above) |
+| `KBBOT_MAX_HISTORY_MESSAGES` | `20` | Per-sender history depth |
 
-### Other bots
+### viktor
 
-See Viktor etc.
+| Variable | Default | Description |
+|---|---|---|
+| `VIKTOR_LLM_API_KEY` | *required* | OpenAI-compatible API key |
+| `VIKTOR_LLM_MODEL` | `gpt-oss` | Model name |
+| `VIKTOR_LLM_BASE_URL` | `https://api.openai.com/v1` | Endpoint |
+| `VIKTOR_NAMETAG` | `viktor` | Sphere nametag |
+| `VIKTOR_NETWORK` | `testnet` | Network |
+| `VIKTOR_MNEMONIC` | — | Wallet mnemonic |
 
-### 3. Rebuild
+### chess-bot
+
+| Variable | Default | Description |
+|---|---|---|
+| `CHESS_BOT_NAMETAG` | `chess-bot` | Sphere nametag |
+| `CHESS_BOT_GROUP_ID` | `chess` | Group chat ID |
+| `CHESS_BOT_MNEMONIC` | — | Wallet mnemonic |
+| `MAX_CONCURRENT_GAMES` | `10` | Game concurrency limit |
+
+### unicity-l3
+
+| Variable | Default | Description |
+|---|---|---|
+| `L3_GROUP_ID` | *required* | Sphere group chat ID |
+| `L3_NAMETAG` | `unicity-l3` | Sphere nametag |
+| `L3_NETWORK` | `testnet` | Network |
+| `L3_MNEMONIC` | — | Wallet mnemonic |
+| `L3_AGGREGATOR_URL` | `https://goggregator-test.unicity.network/` | Aggregator endpoint |
+| `L3_EXPLORER_BASE_URL` | `https://unicitynetwork.github.io/smt-explorer/` | Explorer for posted links |
+| `L3_POLL_INTERVAL_MS` | `1500` | Aggregator poll cadence |
+| `L3_SHOW_EMPTY_BLOCKS` | `false` | Whether to post empty blocks |
+
+### Shared
+
+| Variable | Description |
+|---|---|
+| `SEARXNG_URL` | SearXNG endpoint for `mcp-web` (default: internal Docker URL) |
+| `ORACLE_DEBUG` | Verbose aggregator/oracle logging |
+| `TRUSTBASE_PATH` | Path to a trust-base JSON for oracle ops |
+
+## SphereBotConfig (kbbot, viktor)
+
+The `@agentic/sphere-bot` library is configured per-bot via
+`packages/<bot>/src/config.ts`. Key fields:
+
+- `llm.provider` — `'google'` or `'openai-compatible'`
+- `mcpServers` — array of `{ name, url }`
+- `maxSteps` — max tool-call rounds before forcing text generation
+- `maxToolResultChars` / `maxContextChars` — truncation limits
+- `tokenTransferPrompt` — system prompt for replying to incoming token
+  transfers
+- `cacheMessages` — set `false` to disable SDK-side DM caching (default
+  `true`)
+- `oracle.trustBasePath` / `oracle.debug` — optional aggregator overrides
+
+## RAG Knowledge Base
+
+`mcp-rag` does semantic search over Markdown files in `rag/`:
+
+- Index is rebuilt on every container start (Chroma DB is persisted at
+  `data/mcp-rag/chromadb/`).
+- Section-aware chunking preserves header context.
+
+To update:
 
 ```bash
-docker compose up --build agent-server
+# edit rag/*.md
+docker compose restart mcp-rag
 ```
 
-### LLM Provider Options
-
-**Gemini:**
-```typescript
-llm: {
-    provider: 'gemini',
-    model: 'gemini-2.5-flash',
-    temperature: 0.7,
-}
-```
-
-**OpenAI-compatible** (local or remote, supports failover with comma-separated URLs/keys):
-```typescript
-llm: {
-    provider: 'openai-compatible',
-    model: 'gpt-4',
-    baseUrl: 'http://localhost:8000/v1',
-    apiKey: process.env.OPENAI_API_KEY,
-    temperature: 0.7,
-}
-```
-
-## Creating MCP Servers
-
-### 1. Create Package
+## Creating a new MCP Server
 
 ```bash
 mkdir -p packages/mcp-myservice/src
 ```
-
-### 2. Implement Server
 
 ```typescript
 // packages/mcp-myservice/src/server.ts
@@ -213,63 +231,42 @@ import { z } from 'zod';
 const server = new McpServer({ name: 'myservice', version: '1.0.0' });
 
 server.tool(
-    'my_tool',
-    'Description of what this tool does',
-    { input: z.string().describe('Input parameter') },
-    async ({ input }) => ({
-        content: [{ type: 'text', text: JSON.stringify({ result: input }) }],
-    })
+  'my_tool',
+  'Description of what this tool does',
+  { input: z.string().describe('Input parameter') },
+  async ({ input }) => ({
+    content: [{ type: 'text', text: JSON.stringify({ result: input }) }],
+  }),
 );
 
-async function main() {
-    const port = parseInt(process.env.PORT || '3003');
-    const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-    });
-    await server.connect(transport);
+const port = parseInt(process.env.PORT || '3004');
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: () => randomUUID(),
+});
+await server.connect(transport);
 
-    createServer((req, res) => {
-        if (req.url === '/mcp') transport.handleRequest(req, res);
-        else { res.writeHead(404); res.end('Not Found'); }
-    }).listen(port, () => console.log(`MCP server on port ${port}`));
-}
-
-main().catch(console.error);
+createServer((req, res) => {
+  if (req.url === '/mcp') transport.handleRequest(req, res);
+  else { res.writeHead(404); res.end('Not Found'); }
+}).listen(port, () => console.log(`MCP server on port ${port}`));
 ```
 
-### 3. Add to Docker Compose and Activity Config
+Add the service to `docker-compose.yml` (see `mcp-web` / `mcp-rag` for
+patterns) and reference its URL in the relevant bot's `mcpServers`
+config.
 
-See existing services in `docker-compose.yml` for Dockerfile patterns.
+## Notes & Conventions
 
-## Bot Data & Backup
-
-Bot wallets and tokens are stored in local folders (bind-mounted into containers):
-
-```
-data/
-├── kbbot/
-│   ├── data/       # wallet.json
-│   └── tokens/     # token state
-└── viktor/
-    ├── data/       # wallet.json
-    └── tokens/     # token state
-```
-
-The `data/` directory is gitignored. Use the backup/restore script to migrate between machines:
-
-```bash
-# Backup
-./scripts/bot-backup.sh backup kbbot    # creates kbbot-backup.tar.gz
-./scripts/bot-backup.sh backup viktor   # creates viktor-backup.tar.gz
-
-# Restore
-./scripts/bot-backup.sh restore kbbot   # extracts into data/kbbot/
-./scripts/bot-backup.sh restore viktor  # extracts into data/viktor/
-```
+- TypeScript ES modules (`"type": "module"`, `NodeNext` resolution); use
+  `.js` extensions in imports.
+- Bots default to `testnet`; flip with the `*_NETWORK` env var.
+- MCP connections are persistent — restart the bot container if a
+  connection issue surfaces.
+- No tests currently. Test infrastructure was removed alongside the old
+  agent-server frontend.
 
 ## Additional Resources
 
-- [Model Context Protocol Documentation](https://modelcontextprotocol.io/)
-- [Vercel AI SDK Documentation](https://sdk.vercel.ai/docs)
-- [Sphere SDK Documentation](https://github.com/unicity-sphere/sphere-sdk)
-- [Hono Documentation](https://hono.dev/)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Vercel AI SDK v6](https://sdk.vercel.ai/docs)
+- [Sphere SDK](https://github.com/unicity-sphere/sphere-sdk)
