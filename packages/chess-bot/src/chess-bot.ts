@@ -37,7 +37,7 @@ export class ChessBot {
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
       l1: null,
-      autoGenerate: true,
+      autoGenerate: false,
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,
       groupChat: !!this.config.groupId,

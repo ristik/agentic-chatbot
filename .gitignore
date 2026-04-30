@@ -65,3 +65,4 @@ postgres_data/
 # Package manager locks (keep pnpm-lock.yaml, ignore others)
 package-lock.json
 yarn.lock
+CLAUDE.md

@@ -44,7 +44,7 @@ async function initSphere() {
   // Normal init — loads existing wallet or auto-generates new one
   const { sphere, created, generatedMnemonic } = await Sphere.init({
     ...providers,
-    autoGenerate: true,
+    autoGenerate: false,
     nametag: config.nametag,
     mnemonic: config.mnemonic,
     groupChat: true,
