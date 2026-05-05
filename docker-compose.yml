@@ -19,6 +19,7 @@ services:
         SETTINGS
         fi
         exec /usr/local/searxng/.venv/bin/granian searx.webapp:app
+    mem_limit: 256m
     restart: unless-stopped
 
   mcp-web:
@@ -31,6 +32,7 @@ services:
       PORT: 3002
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
       SEARXNG_KEY: ${SEARXNG_KEY:-}
+    mem_limit: 256m
     restart: unless-stopped
 
   mcp-rag:
@@ -46,6 +48,7 @@ services:
     volumes:
       - ./rag:/data/docs:ro
       - ./data/mcp-rag/chromadb:/data/chromadb
+    mem_limit: 512m
     restart: unless-stopped
 
   kbbot:
@@ -68,6 +71,7 @@ services:
       MAX_HISTORY_MESSAGES: ${KBBOT_MAX_HISTORY_MESSAGES:-20}
       TRUSTBASE_PATH: /app/trustbase-testnet.json
       ORACLE_DEBUG: ${ORACLE_DEBUG:-true}
+      NODE_OPTIONS: --max-old-space-size=512
     volumes:
       - ./data/kbbot/data:/app/data
       - ./data/kbbot/tokens:/app/tokens
@@ -76,6 +80,7 @@ services:
         condition: service_started
       mcp-web:
         condition: service_started
+    mem_limit: 768m
     restart: unless-stopped
 
   viktor:
@@ -95,6 +100,7 @@ services:
       MCP_WEB_URL: http://mcp-web:3002/mcp
       DATA_DIR: /app/data
       TOKENS_DIR: /app/tokens
+      NODE_OPTIONS: --max-old-space-size=512
     volumes:
       - ./data/viktor/data:/app/data
       - ./data/viktor/tokens:/app/tokens
@@ -103,6 +109,7 @@ services:
         condition: service_started
       mcp-web:
         condition: service_started
+    mem_limit: 768m
     restart: unless-stopped
 
   chess-bot:
@@ -119,9 +126,11 @@ services:
       GROUP_ID: ${CHESS_BOT_GROUP_ID:-chess}
       DATA_DIR: /app/data
       TOKENS_DIR: /app/tokens
+      NODE_OPTIONS: --max-old-space-size=512
     volumes:
       - ./data/chess-bot/data:/app/data
       - ./data/chess-bot/tokens:/app/tokens
+    mem_limit: 768m
     restart: unless-stopped
 
   unicity-l3:
@@ -141,9 +150,11 @@ services:
       SHOW_EMPTY_BLOCKS: ${L3_SHOW_EMPTY_BLOCKS:-false}
       DATA_DIR: /app/data
       TOKENS_DIR: /app/tokens
+      NODE_OPTIONS: --max-old-space-size=256
     volumes:
       - ./data/unicity-l3/data:/app/data
       - ./data/unicity-l3/tokens:/app/tokens
+    mem_limit: 384m
     restart: unless-stopped
 
 networks:
