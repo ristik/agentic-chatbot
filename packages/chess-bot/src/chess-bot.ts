@@ -11,6 +11,7 @@ import { Game, type GameEndInfo } from './game.js';
 import type { ChessBotConfig } from './config.js';
 import { BotWallet } from './wallet.js';
 import { StockfishEngine } from './stockfish.js';
+import { rewardForElo } from './rewards.js';
 
 // Polyfill WebSocket for Node.js (required by sphere-sdk)
 if (typeof globalThis.WebSocket === 'undefined') {
@@ -204,7 +205,7 @@ export class ChessBot {
       onGameEnd: (info) => {
         this.games.delete(info.gameId);
         console.log(`${this.tag} Game ${info.gameId} ended (${this.games.size} active)`);
-        this.handleGameEnd(info, myColor, senderPubkey, senderNametag).catch((err) =>
+        this.handleGameEnd(info, myColor, challenge.elo, senderPubkey, senderNametag).catch((err) =>
           console.error(`${this.tag} Post-game handling failed:`, err),
         );
         this.postGameResult(info, label, challenge.elo, myColor).catch((err) =>
@@ -226,6 +227,7 @@ export class ChessBot {
   private async handleGameEnd(
     info: GameEndInfo,
     botColor: 'w' | 'b',
+    elo: number,
     opponentPubkey: string,
     opponentNametag: string | undefined,
   ): Promise<void> {
@@ -235,14 +237,15 @@ export class ChessBot {
     if (this.paidGameIds.has(info.gameId)) return;
     this.paidGameIds.add(info.gameId);
 
+    const reward = rewardForElo(elo);
     const recipient = opponentNametag ? `@${opponentNametag}` : opponentPubkey;
     console.log(
-      `${this.tag} Bot lost game ${info.gameId} — paying ${this.config.rewardAmount} ${this.config.coinSymbol} to ${recipient}`,
+      `${this.tag} Bot lost game ${info.gameId} (elo ${elo}) — paying ${reward} ${this.config.coinSymbol} to ${recipient}`,
     );
 
     const result = await this.wallet.sendReward(
       recipient,
-      this.config.rewardAmount,
+      reward,
       `unichess reward ${info.gameId}`,
     );
     if (!result.ok) {

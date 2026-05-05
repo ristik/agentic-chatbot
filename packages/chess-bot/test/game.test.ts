@@ -1,9 +1,22 @@
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.js';
+import { StockfishEngine } from '../src/stockfish.js';
 import { parseMessage, ACTION } from '../src/protocol.js';
 
 describe('Game', () => {
+  // One shared engine matches the production setup (chess-bot owns one engine).
+  let engine: StockfishEngine;
+
+  before(async () => {
+    engine = new StockfishEngine();
+    await engine.init();
+  });
+
+  after(() => {
+    engine?.destroy();
+  });
+
   it('bot plays white — makes first move and sends it', async () => {
     const sent: string[] = [];
     let ended = false;
@@ -13,6 +26,7 @@ describe('Game', () => {
       myColor: 'w',
       timeControlMs: 300_000,
       elo: 1500,
+      engine,
       sendMessage: async (msg) => { sent.push(msg); },
       onGameEnd: () => { ended = true; },
     });
@@ -41,6 +55,7 @@ describe('Game', () => {
       myColor: 'b',
       timeControlMs: 300_000,
       elo: 1500,
+      engine,
       sendMessage: async (msg) => { sent.push(msg); },
       onGameEnd: () => {},
     });
@@ -81,6 +96,7 @@ describe('Game', () => {
       myColor: 'b',
       timeControlMs: 300_000,
       elo: 1500,
+      engine,
       sendMessage: async (msg) => { sent.push(msg); },
       onGameEnd: () => {},
     });
@@ -107,6 +123,7 @@ describe('Game', () => {
       myColor: 'b',
       timeControlMs: 300_000,
       elo: 1500,
+      engine,
       sendMessage: async (msg) => { sent.push(msg); },
       onGameEnd: (info) => { endedGameId = info.gameId; },
     });
@@ -139,6 +156,7 @@ describe('Game', () => {
       myColor: 'b',
       timeControlMs: 300_000,
       elo: 1500,
+      engine,
       sendMessage: async () => {},
       onGameEnd: (info) => { endedGameId = info.gameId; },
     });
@@ -165,6 +183,7 @@ describe('Game', () => {
       myColor: 'w',
       timeControlMs: 300_000,
       elo: 2100,
+      engine,
       sendMessage: async (msg) => { sent.push(msg); },
       onGameEnd: (info) => { endedGameId = info.gameId; },
     });

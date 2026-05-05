@@ -20,7 +20,11 @@ export class StockfishEngine extends EventEmitter {
 
   private async create(): Promise<void> {
     // Use the lite ASM.JS build: pure JS, no WASM/SharedArrayBuffer/worker issues.
+    // The asm.js factory keeps closure state across calls; clearing the require
+    // cache forces a fresh outer factory so multiple StockfishEngine instances
+    // (e.g. one per test) can each init successfully.
     const sfPath = require.resolve('stockfish/bin/stockfish-18-asm.js');
+    delete require.cache[sfPath];
     const outerFactory = require(sfPath);
     const innerFactory = outerFactory();
     const engineModule = await innerFactory();
