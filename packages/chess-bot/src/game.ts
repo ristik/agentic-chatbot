@@ -22,6 +22,8 @@ export interface GameOptions {
   myColor: 'w' | 'b';
   timeControlMs: number;
   elo: number;
+  /** Shared engine owned by the bot — initialized once, reused across games. */
+  engine: StockfishEngine;
   sendMessage: (msg: string) => Promise<void>;
   onGameEnd: (info: GameEndInfo) => void;
 }
@@ -53,7 +55,7 @@ export class Game {
     this.myColor = options.myColor;
     this.elo = options.elo;
     this.chess = new Chess();
-    this.engine = new StockfishEngine();
+    this.engine = options.engine;
     this.myClockMs = options.timeControlMs;
     this.opponentClockMs = options.timeControlMs;
     this.sendMessage = options.sendMessage;
@@ -61,16 +63,6 @@ export class Game {
     this.timeControlMs = options.timeControlMs;
     this.lastOpponentActivity = Date.now();
     this.tag = `[game:${options.gameId}]`;
-
-    this.engine.on('exit', () => {
-      if (!this.ended) {
-        this.log('ENGINE CRASHED — resigning');
-        this.sendMessage(
-          encodeMessage({ action: ACTION.RESIGN, gameId: this.gameId }),
-        ).catch(() => {});
-        this.cleanup();
-      }
-    });
   }
 
   private log(msg: string): void {
@@ -79,8 +71,6 @@ export class Game {
 
   async start(): Promise<void> {
     this.log(`START color=${this.myColor} elo=${this.elo} time=${this.timeControlMs}ms`);
-    await this.engine.init(this.elo);
-    this.log('Stockfish ready');
 
     if (this.myColor === 'w') {
       this.log('Playing white — making first move after 1.5s delay');
@@ -179,7 +169,12 @@ export class Game {
 
     let uciMove: string;
     try {
-      uciMove = await this.engine.getBestMove(this.chess.fen(), thinkTime);
+      uciMove = await this.engine.getBestMove({
+        fen: this.chess.fen(),
+        thinkTimeMs: thinkTime,
+        elo: this.elo,
+        gameId: this.gameId,
+      });
     } catch (err) {
       this.log(`STOCKFISH ERROR: ${err} — resigning`);
       this.sendMessage(
@@ -282,7 +277,6 @@ export class Game {
 
     this.sendMessage('gg').catch(() => {});
 
-    this.engine.destroy();
     this.onGameEnd({ gameId: this.gameId, result, reason, pgn: this.chess.pgn() });
   }
 
@@ -346,7 +340,6 @@ export class Game {
     this.ended = true;
     this.log('CLEANUP');
     this.stopPolling();
-    this.engine.destroy();
     this.onGameEnd({ gameId: this.gameId, result: null, reason: null, pgn: this.chess.pgn() });
   }
 }

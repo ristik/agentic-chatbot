@@ -10,6 +10,7 @@ import {
 import { Game, type GameEndInfo } from './game.js';
 import type { ChessBotConfig } from './config.js';
 import { BotWallet } from './wallet.js';
+import { StockfishEngine } from './stockfish.js';
 
 // Polyfill WebSocket for Node.js (required by sphere-sdk)
 if (typeof globalThis.WebSocket === 'undefined') {
@@ -19,6 +20,7 @@ if (typeof globalThis.WebSocket === 'undefined') {
 export class ChessBot {
   private sphere: Sphere | null = null;
   private wallet: BotWallet | null = null;
+  private engine: StockfishEngine | null = null;
   private games = new Map<string, Game>();
   private handledGameIds = new Set<string>();
   private paidGameIds = new Set<string>();
@@ -62,6 +64,13 @@ export class ChessBot {
     const identity = sphere.identity;
     console.log(`${this.tag} Nametag: @${identity?.nametag}`);
     console.log(`${this.tag} Max concurrent games: ${this.config.maxConcurrentGames}`);
+
+    // One Stockfish instance shared across all games — concurrent moves are serialized
+    // by the engine's internal mutex. Avoids accumulating ASM.js heaps per-game.
+    console.log(`${this.tag} Initializing shared Stockfish engine...`);
+    this.engine = new StockfishEngine();
+    await this.engine.init();
+    console.log(`${this.tag} Stockfish ready`);
 
     // Initialize the reward wallet and ensure we have funds before accepting games.
     this.wallet = new BotWallet({
@@ -175,12 +184,22 @@ export class ChessBot {
       setTimeout(() => this.sendDM(senderPubkey, okMsg).catch(() => {}), delay);
     }
 
+    if (!this.engine) {
+      console.error(`${this.tag} Stockfish engine not ready — declining ${challenge.gameId}`);
+      await this.sendDM(
+        senderPubkey,
+        encodeMessage({ action: ACTION.DECLINE, gameId: challenge.gameId }),
+      );
+      return;
+    }
+
     // Create and start the game
     const game = new Game({
       gameId: challenge.gameId,
       myColor,
       timeControlMs: challenge.timeMinutes * 60 * 1000,
       elo: challenge.elo,
+      engine: this.engine,
       sendMessage: (msg) => this.sendDM(senderPubkey, msg),
       onGameEnd: (info) => {
         this.games.delete(info.gameId);
@@ -298,6 +317,10 @@ export class ChessBot {
       game.cleanup();
     }
     this.games.clear();
+    if (this.engine) {
+      this.engine.destroy();
+      this.engine = null;
+    }
     if (this.sphere) {
       await this.sphere.destroy();
       this.sphere = null;
