@@ -13,6 +13,16 @@ export interface ChessBotConfig {
   maxConcurrentGames: number;
   /** Group chat ID for posting game results (optional) */
   groupId?: string;
+  /** Reward in whole UCT paid to the human when they beat the bot */
+  rewardAmount: number;
+  /** Refill the wallet up to this many UCT when balance falls below `minBalance` */
+  targetBalance: number;
+  /** Trigger a faucet refill once balance drops under this many UCT */
+  minBalance: number;
+  /** Coin symbol used for rewards */
+  coinSymbol: string;
+  /** Faucet endpoint used to top up the bot's wallet */
+  faucetUrl: string;
 }
 
 export function loadConfig(): ChessBotConfig {
@@ -24,5 +34,12 @@ export function loadConfig(): ChessBotConfig {
     tokensDir: process.env.TOKENS_DIR || './data/chess-bot/tokens',
     maxConcurrentGames: parseInt(process.env.MAX_CONCURRENT_GAMES || '10', 10),
     groupId: process.env.GROUP_ID || undefined,
+    rewardAmount: parseInt(process.env.REWARD_AMOUNT || '20', 10),
+    targetBalance: parseInt(process.env.TARGET_BALANCE || '1000', 10),
+    minBalance: parseInt(process.env.MIN_BALANCE || '100', 10),
+    coinSymbol: process.env.COIN_SYMBOL || 'UCT',
+    faucetUrl:
+      process.env.FAUCET_URL ||
+      'https://faucet.unicity.network/api/v1/faucet/request',
   };
 }

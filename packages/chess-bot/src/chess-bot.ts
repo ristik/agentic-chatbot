@@ -9,6 +9,7 @@ import {
 } from './protocol.js';
 import { Game, type GameEndInfo } from './game.js';
 import type { ChessBotConfig } from './config.js';
+import { BotWallet } from './wallet.js';
 
 // Polyfill WebSocket for Node.js (required by sphere-sdk)
 if (typeof globalThis.WebSocket === 'undefined') {
@@ -17,8 +18,10 @@ if (typeof globalThis.WebSocket === 'undefined') {
 
 export class ChessBot {
   private sphere: Sphere | null = null;
+  private wallet: BotWallet | null = null;
   private games = new Map<string, Game>();
   private handledGameIds = new Set<string>();
+  private paidGameIds = new Set<string>();
   private tag: string;
 
   constructor(private config: ChessBotConfig) {
@@ -59,6 +62,21 @@ export class ChessBot {
     const identity = sphere.identity;
     console.log(`${this.tag} Nametag: @${identity?.nametag}`);
     console.log(`${this.tag} Max concurrent games: ${this.config.maxConcurrentGames}`);
+
+    // Initialize the reward wallet and ensure we have funds before accepting games.
+    this.wallet = new BotWallet({
+      sphere,
+      nametag: identity?.nametag ?? this.config.nametag,
+      coinSymbol: this.config.coinSymbol,
+      faucetUrl: this.config.faucetUrl,
+      targetBalance: this.config.targetBalance,
+      minBalance: this.config.minBalance,
+      tag: `${this.tag}[wallet]`,
+    });
+
+    this.wallet.ensureBalance().catch((err) =>
+      console.error(`${this.tag} Initial balance check failed:`, err),
+    );
 
     // Listen for incoming DMs
     sphere.communications.onDirectMessage(async (message: { content: string; senderPubkey: string; senderNametag?: string }) => {
@@ -167,6 +185,9 @@ export class ChessBot {
       onGameEnd: (info) => {
         this.games.delete(info.gameId);
         console.log(`${this.tag} Game ${info.gameId} ended (${this.games.size} active)`);
+        this.handleGameEnd(info, myColor, senderPubkey, senderNametag).catch((err) =>
+          console.error(`${this.tag} Post-game handling failed:`, err),
+        );
         this.postGameResult(info, label, challenge.elo, myColor).catch((err) =>
           console.error(`${this.tag} Failed to post game result:`, err),
         );
@@ -181,6 +202,42 @@ export class ChessBot {
       console.error(`${this.tag} Failed to start game ${challenge.gameId}:`, err);
       game.cleanup();
     }
+  }
+
+  private async handleGameEnd(
+    info: GameEndInfo,
+    botColor: 'w' | 'b',
+    opponentPubkey: string,
+    opponentNametag: string | undefined,
+  ): Promise<void> {
+    if (!this.wallet) return;
+    if (!info.result || info.result === 'd') return;
+    if (info.result === botColor) return;
+    if (this.paidGameIds.has(info.gameId)) return;
+    this.paidGameIds.add(info.gameId);
+
+    const recipient = opponentNametag ? `@${opponentNametag}` : opponentPubkey;
+    console.log(
+      `${this.tag} Bot lost game ${info.gameId} — paying ${this.config.rewardAmount} ${this.config.coinSymbol} to ${recipient}`,
+    );
+
+    const result = await this.wallet.sendReward(
+      recipient,
+      this.config.rewardAmount,
+      `unichess reward ${info.gameId}`,
+    );
+    if (!result.ok) {
+      console.error(
+        `${this.tag} Failed to pay reward for ${info.gameId}: ${result.error ?? 'unknown error'}`,
+      );
+      // Allow retry on a future game end if this one didn't go through.
+      this.paidGameIds.delete(info.gameId);
+    }
+
+    // After paying out (or trying to), top up if we're now low.
+    this.wallet.ensureBalance().catch((err) =>
+      console.error(`${this.tag} Post-payout top-up failed:`, err),
+    );
   }
 
 
