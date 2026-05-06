@@ -128,9 +128,7 @@ async function main() {
 
         if (height <= prev) continue;
 
-        // Process new blocks (cap at 10 per poll to avoid flooding)
-        const start = Math.max(prev + 1, height - 9);
-        for (let blockNr = start; blockNr <= height; blockNr++) {
+        for (let blockNr = prev + 1; blockNr <= height; blockNr++) {
           try {
             const block = await aggregator.getBlock(blockNr, shardId);
             if (!config.showEmptyBlocks && block.totalCommitments === 0) continue;
