@@ -127,10 +127,25 @@ export class Game {
           this.cleanup();
         }
         break;
-      case ACTION.GAMEOVER:
+      case ACTION.GAMEOVER: {
         this.log(`RECV gameover ${msg.result} by ${msg.reason}`);
-        this.cleanup();
+        // Opponent claiming a draw or their own loss is safe to trust — bot
+        // owes no reward either way and we want the post-game routine (group
+        // post) to run. If they claim they won, only honor it when local
+        // state agrees, else an opponent could fake a checkmate to extract a
+        // reward from the bot.
+        const opponentClaimsBotLost =
+          msg.result !== 'd' && msg.result !== this.myColor;
+        if (opponentClaimsBotLost && !this.verifyOpponentBotLossClaim(msg.reason)) {
+          this.log(
+            `REJECTED opponent gameover ${msg.result} by ${msg.reason} — local state disagrees`,
+          );
+          this.cleanup();
+          break;
+        }
+        await this.endGame(msg.result, msg.reason);
         break;
+      }
       default:
         this.log(`IGNORED unknown action: ${msg.action}`);
         break;
@@ -225,6 +240,15 @@ export class Game {
 
     this.log('Waiting for opponent — starting poll');
     this.startPolling();
+  }
+
+  private verifyOpponentBotLossClaim(reason: GameOverReason): boolean {
+    // Only checkmate is independently verifiable from the chess position.
+    // timeout/resign/disconnect/agreement: the bot would have authored these
+    // itself if they were true (own clock, own RESIGN, own poll, own draw
+    // accept). Draw reasons (stalemate/repetition/material/50move) contradict
+    // a non-draw result.
+    return reason === 'checkmate' && this.chess.isCheckmate();
   }
 
   private checkTerminal(): boolean {

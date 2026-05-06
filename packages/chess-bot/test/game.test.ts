@@ -171,6 +171,123 @@ describe('Game', () => {
     assert.equal(endedGameId, 'test0005');
   });
 
+  it('opponent-reported gameover (bot wins) routes through endGame', async () => {
+    const sent: string[] = [];
+    let endInfo: { gameId: string; result: string | null; reason: string | null } | null = null;
+
+    const game = new Game({
+      gameId: 'go-botwin',
+      myColor: 'w',
+      timeControlMs: 300_000,
+      elo: 1500,
+      engine,
+      sendMessage: async (msg) => { sent.push(msg); },
+      onGameEnd: (info) => { endInfo = { gameId: info.gameId, result: info.result, reason: info.reason }; },
+    });
+    await game.start();
+
+    // Opponent (black) declares their own loss — e.g. their client detected
+    // their own clock ran out. Bot should run the full end-of-game routine.
+    await game.handleMessage({
+      action: ACTION.GAMEOVER,
+      gameId: 'go-botwin',
+      result: 'w',
+      reason: 'timeout',
+    });
+
+    assert.ok(endInfo, 'onGameEnd should have fired');
+    assert.equal(endInfo!.result, 'w');
+    assert.equal(endInfo!.reason, 'timeout');
+    assert.ok(sent.some((m) => m.includes(':go:w:timeout')), 'bot should ack with its own gameover');
+    assert.ok(sent.includes('gg'), 'bot should send gg');
+  });
+
+  it('opponent-reported draw routes through endGame', async () => {
+    const sent: string[] = [];
+    let endInfo: { result: string | null; reason: string | null } | null = null;
+
+    const game = new Game({
+      gameId: 'go-draw00',
+      myColor: 'b',
+      timeControlMs: 300_000,
+      elo: 1500,
+      engine,
+      sendMessage: async (msg) => { sent.push(msg); },
+      onGameEnd: (info) => { endInfo = { result: info.result, reason: info.reason }; },
+    });
+    await game.start();
+
+    await game.handleMessage({
+      action: ACTION.GAMEOVER,
+      gameId: 'go-draw00',
+      result: 'd',
+      reason: 'agreement',
+    });
+
+    assert.ok(endInfo);
+    assert.equal(endInfo!.result, 'd');
+    assert.equal(endInfo!.reason, 'agreement');
+    assert.ok(sent.some((m) => m.includes(':go:d:agreement')));
+  });
+
+  it('rejects unverifiable opponent claim that bot lost (fake checkmate)', async () => {
+    const sent: string[] = [];
+    let endInfo: { result: string | null; reason: string | null } | null = null;
+
+    const game = new Game({
+      gameId: 'go-fakecm',
+      myColor: 'w',
+      timeControlMs: 300_000,
+      elo: 1500,
+      engine,
+      sendMessage: async (msg) => { sent.push(msg); },
+      onGameEnd: (info) => { endInfo = { result: info.result, reason: info.reason }; },
+    });
+    await game.start();
+    sent.length = 0; // discard opening move
+
+    // Opponent claims they checkmated the bot, but the position is not mate.
+    await game.handleMessage({
+      action: ACTION.GAMEOVER,
+      gameId: 'go-fakecm',
+      result: 'b',
+      reason: 'checkmate',
+    });
+
+    assert.ok(endInfo, 'onGameEnd should still fire (cleanup path)');
+    assert.equal(endInfo!.result, null, 'cleanup path leaves result null so no reward is paid');
+    assert.equal(endInfo!.reason, null);
+    assert.ok(!sent.some((m) => m.includes(':go:')), 'bot must not echo the fake gameover');
+    assert.ok(!sent.includes('gg'), 'bot must not send gg for a rejected claim');
+  });
+
+  it('rejects opponent claim that bot lost on time', async () => {
+    let endInfo: { result: string | null } | null = null;
+
+    const game = new Game({
+      gameId: 'go-faketo',
+      myColor: 'b',
+      timeControlMs: 300_000,
+      elo: 1500,
+      engine,
+      sendMessage: async () => {},
+      onGameEnd: (info) => { endInfo = { result: info.result }; },
+    });
+    await game.start();
+
+    await game.handleMessage({
+      action: ACTION.GAMEOVER,
+      gameId: 'go-faketo',
+      result: 'w',
+      reason: 'timeout',
+    });
+
+    // Bot is black, so result='w' means opponent claims bot lost on time.
+    // The bot itself would have detected its own timeout; trust nothing here.
+    assert.ok(endInfo);
+    assert.equal(endInfo!.result, null);
+  });
+
   it('plays a full short game (bot vs simulated opponent)', async () => {
     // Scholar's mate: 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 4.Qxf7#
     const opponentMoves = ['e5', 'Nc6', 'Nf6'];
