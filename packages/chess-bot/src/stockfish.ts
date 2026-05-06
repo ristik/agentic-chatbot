@@ -25,9 +25,17 @@ export class StockfishEngine extends EventEmitter {
     // (e.g. one per test) can each init successfully.
     const sfPath = require.resolve('stockfish/bin/stockfish-18-asm.js');
     delete require.cache[sfPath];
+    // The asm.js inner factory does a bare `fetch=null` in its Node branch to
+    // force XHR-based file loading; in CJS non-strict scope that wipes out
+    // globalThis.fetch and breaks every later HTTP call (SDK aggregator,
+    // faucet, etc). Save and restore around the whole init.
+    const savedFetch = globalThis.fetch;
     const outerFactory = require(sfPath);
     const innerFactory = outerFactory();
     const engineModule = await innerFactory();
+    if (savedFetch && globalThis.fetch !== savedFetch) {
+      globalThis.fetch = savedFetch;
+    }
 
     this.engine = engineModule;
     this.engine!.listener = (line: string) => {

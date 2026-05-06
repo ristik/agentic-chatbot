@@ -9,6 +9,54 @@ describe('StockfishEngine', () => {
     engine.destroy();
   });
 
+  it('does not clobber globalThis.fetch on init', async () => {
+    // stockfish-18-asm.js does a bare `fetch=null` in its Node branch which,
+    // in non-strict CJS scope, wipes globalThis.fetch and breaks every later
+    // SDK HTTP call (aggregator submit, faucet, etc). Regression guard.
+    // Reseat fetch in case a previous test in this file already lost it.
+    if (typeof globalThis.fetch !== 'function') {
+      const undici = await import('undici');
+      globalThis.fetch = undici.fetch as unknown as typeof globalThis.fetch;
+    }
+    const before = globalThis.fetch;
+    assert.equal(typeof before, 'function');
+
+    const engine = new StockfishEngine();
+    await engine.init();
+    try {
+      assert.equal(typeof globalThis.fetch, 'function', 'fetch was nulled by stockfish init');
+      assert.equal(globalThis.fetch, before, 'fetch was replaced by stockfish init');
+    } finally {
+      engine.destroy();
+    }
+  });
+
+  it('post-init fetch reaches the testnet aggregator', async (t) => {
+    // Beyond the identity check above: actually exercise fetch against the
+    // network. The SDK's JsonRpcHttpTransport calls bare `fetch(...)` (no
+    // captured reference), so a direct fetch from this test resolves the same
+    // global the SDK does — equivalent today.
+    const baseUrl = process.env.AGGREGATOR_URL || 'https://goggregator-test.unicity.network';
+    const healthUrl = baseUrl.replace(/\/$/, '') + '/health';
+
+    const engine = new StockfishEngine();
+    await engine.init();
+    try {
+      let response: Response;
+      try {
+        response = await fetch(healthUrl, { signal: AbortSignal.timeout(8_000) });
+      } catch (err) {
+        // Network/DNS failure — fetch itself is fine, the testnet just isn't
+        // reachable from here. Skip rather than red the suite.
+        t.skip(`aggregator unreachable: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+      assert.ok(response.ok, `aggregator /health returned HTTP ${response.status}`);
+    } finally {
+      engine.destroy();
+    }
+  });
+
   it('returns a valid move from the starting position', async () => {
     const engine = new StockfishEngine();
     await engine.init();
