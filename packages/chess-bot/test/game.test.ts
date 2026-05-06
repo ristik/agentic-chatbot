@@ -288,6 +288,42 @@ describe('Game', () => {
     assert.equal(endInfo!.result, null);
   });
 
+  it('populates PGN headers from GameOptions and updates Result on end', async () => {
+    let endPgn = '';
+    const game = new Game({
+      gameId: 'pgn00001',
+      myColor: 'b',
+      timeControlMs: 300_000,
+      elo: 1500,
+      engine,
+      sendMessage: async () => {},
+      onGameEnd: (info) => { endPgn = info.pgn; },
+      whitePlayer: '@yobrian',
+      blackPlayer: '@chess-bot',
+      blackElo: 800,
+    });
+    await game.start();
+
+    // Opponent (white) declares their own loss → bot (black) wins.
+    await game.handleMessage({
+      action: ACTION.GAMEOVER,
+      gameId: 'pgn00001',
+      result: 'b',
+      reason: 'timeout',
+    });
+
+    assert.match(endPgn, /\[Event "Unicity Chess"\]/);
+    assert.match(endPgn, /\[Site "https:\/\/sphere\.unicity\.network"\]/);
+    assert.match(endPgn, /\[Date "\d{4}\.\d{2}\.\d{2}"\]/);
+    assert.match(endPgn, /\[White "@yobrian"\]/);
+    assert.match(endPgn, /\[Black "@chess-bot"\]/);
+    assert.match(endPgn, /\[BlackElo "800"\]/);
+    assert.match(endPgn, /\[Result "0-1"\]/);
+    assert.match(endPgn, /\[Termination "timeout"\]/);
+    assert.match(endPgn, /\[TimeControl "300"\]/);
+    assert.ok(!endPgn.includes('"?"'), 'no placeholder ? values should remain');
+  });
+
   it('plays a full short game (bot vs simulated opponent)', async () => {
     // Scholar's mate: 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 4.Qxf7#
     const opponentMoves = ['e5', 'Nc6', 'Nf6'];

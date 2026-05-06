@@ -26,6 +26,19 @@ export interface GameOptions {
   engine: StockfishEngine;
   sendMessage: (msg: string) => Promise<void>;
   onGameEnd: (info: GameEndInfo) => void;
+  /** Display name for the white player in the PGN header (default: "White"). */
+  whitePlayer?: string;
+  /** Display name for the black player in the PGN header (default: "Black"). */
+  blackPlayer?: string;
+  /** Optional ELO ratings for the PGN headers. */
+  whiteElo?: number;
+  blackElo?: number;
+  /** PGN Event tag (default: "Unicity Chess"). */
+  event?: string;
+  /** PGN Site tag (default: "https://sphere.unicity.network"). */
+  site?: string;
+  /** PGN Round tag (default: "-"). */
+  round?: string;
 }
 
 export class Game {
@@ -63,6 +76,22 @@ export class Game {
     this.timeControlMs = options.timeControlMs;
     this.lastOpponentActivity = Date.now();
     this.tag = `[game:${options.gameId}]`;
+    this.initPgnHeaders(options);
+  }
+
+  private initPgnHeaders(opts: GameOptions): void {
+    const now = new Date();
+    const date = `${now.getUTCFullYear()}.${String(now.getUTCMonth() + 1).padStart(2, '0')}.${String(now.getUTCDate()).padStart(2, '0')}`;
+    this.chess.setHeader('Event', opts.event ?? 'Unicity Chess');
+    this.chess.setHeader('Site', opts.site ?? 'https://sphere.unicity.network');
+    this.chess.setHeader('Date', date);
+    this.chess.setHeader('Round', opts.round ?? '-');
+    this.chess.setHeader('White', opts.whitePlayer ?? 'White');
+    this.chess.setHeader('Black', opts.blackPlayer ?? 'Black');
+    if (opts.whiteElo != null) this.chess.setHeader('WhiteElo', String(opts.whiteElo));
+    if (opts.blackElo != null) this.chess.setHeader('BlackElo', String(opts.blackElo));
+    this.chess.setHeader('Result', '*');
+    this.chess.setHeader('TimeControl', String(Math.floor(opts.timeControlMs / 1000)));
   }
 
   private log(msg: string): void {
@@ -286,6 +315,10 @@ export class Game {
     if (this.ended) return;
     this.ended = true;
     this.stopPolling();
+
+    const pgnResult = result === 'w' ? '1-0' : result === 'b' ? '0-1' : '1/2-1/2';
+    this.chess.setHeader('Result', pgnResult);
+    this.chess.setHeader('Termination', reason);
 
     const outcome =
       result === 'd'

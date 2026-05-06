@@ -195,6 +195,9 @@ export class ChessBot {
     }
 
     // Create and start the game
+    const botName = `@${this.sphere?.identity?.nametag ?? this.config.nametag}`;
+    const whitePlayer = myColor === 'w' ? botName : label;
+    const blackPlayer = myColor === 'b' ? botName : label;
     const game = new Game({
       gameId: challenge.gameId,
       myColor,
@@ -202,6 +205,10 @@ export class ChessBot {
       elo: challenge.elo,
       engine: this.engine,
       sendMessage: (msg) => this.sendDM(senderPubkey, msg),
+      whitePlayer,
+      blackPlayer,
+      whiteElo: myColor === 'w' ? challenge.elo : undefined,
+      blackElo: myColor === 'b' ? challenge.elo : undefined,
       onGameEnd: (info) => {
         this.games.delete(info.gameId);
         console.log(`${this.tag} Game ${info.gameId} ended (${this.games.size} active)`);
