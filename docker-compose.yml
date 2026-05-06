@@ -157,6 +157,31 @@ services:
     mem_limit: 384m
     restart: unless-stopped
 
+  # Grafana Alloy: container + host metrics → Grafana Cloud Prometheus.
+  # Config and credentials are provisioned by sphere-infra/aws/bots/deploy.sh
+  # (writes /opt/bots/alloy/config.alloy and /opt/bots/.env.grafana).
+  alloy:
+    image: grafana/alloy:v1.16.0
+    networks:
+      - internal
+    env_file:
+      - .env.grafana
+    pid: host
+    privileged: true
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/host/root:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+    mem_limit: 256m
+    restart: unless-stopped
+
 networks:
   internal:
     driver: bridge
