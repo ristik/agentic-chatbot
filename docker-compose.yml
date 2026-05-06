@@ -160,6 +160,11 @@ services:
   # Grafana Alloy: container + host metrics → Grafana Cloud Prometheus.
   # Config and credentials are provisioned by sphere-infra/aws/bots/deploy.sh
   # (writes /opt/bots/alloy/config.alloy and /opt/bots/.env.grafana).
+  #
+  # cAdvisor needs the canonical mounts (/sys/fs/cgroup, /var/lib/docker)
+  # to enumerate per-container cgroups; without them only the root cgroup
+  # is reported. node-exporter (prometheus.exporter.unix) reads host /proc,
+  # /sys and rootfs from the /host/* paths so it doesn't conflict.
   alloy:
     image: grafana/alloy:v1.16.0
     networks:
@@ -171,6 +176,9 @@ services:
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - /dev/disk/:/dev/disk:ro
       - /:/host/root:ro,rslave
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
