@@ -152,11 +152,26 @@ async function main() {
     }
   };
 
-  setInterval(poll, config.pollIntervalMs);
+  // Self-rescheduling poll so a slow round can never overlap the next one.
+  let stopped = false;
+  const schedule = () => {
+    if (stopped) return;
+    setTimeout(async () => {
+      try {
+        await poll();
+      } catch (err) {
+        log(`Poll round error: ${err}`);
+      } finally {
+        schedule();
+      }
+    }, config.pollIntervalMs);
+  };
+  schedule();
 
   // Graceful shutdown
   const shutdown = () => {
     log('Shutting down...');
+    stopped = true;
     process.exit(0);
   };
   process.on('SIGINT', shutdown);

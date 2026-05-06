@@ -21,7 +21,7 @@ export function loadConfig(): L3Config {
     aggregatorUrl: process.env.AGGREGATOR_URL || 'https://goggregator-test.unicity.network/',
     explorerBaseUrl: process.env.EXPLORER_BASE_URL || 'https://unicitynetwork.github.io/smt-explorer/',
     groupId: process.env.GROUP_ID || undefined,
-    pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '1500', 10),
+    pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '60000', 10),
     showEmptyBlocks: process.env.SHOW_EMPTY_BLOCKS === 'true',
   };
 }
