@@ -15,8 +15,8 @@ importers:
   packages/chess-bot:
     dependencies:
       '@unicitylabs/sphere-sdk':
-        specifier: 0.6.14
-        version: 0.6.14(ws@8.19.0)
+        specifier: 0.7.1-dev.3
+        version: 0.7.1-dev.3(ws@8.19.0)
       chess.js:
         specifier: ^1.0.0
         version: 1.4.0
@@ -395,8 +395,21 @@ packages:
     resolution: {integrity: sha512-4ngWJ+P2vyyOWbOU87eGMm23xoLRXH20WMbm03+f9qd1lb8Ced+ErrpO+YqWIHS2x1CuK1bKXU4GheYB1xDY0w==}
     engines: {node: '>=18.0.0'}
 
+  '@unicitylabs/nostr-js-sdk@0.5.0-dev.3':
+    resolution: {integrity: sha512-j1YuLsJs2PDZIEn+98Us/+kbn8kwu6HRMbPuI1lZZXv04cbZdViKcGkEZ/Pi/11QitdOGMkKaXnDncgPc7ccNg==}
+    engines: {node: '>=18.0.0'}
+
   '@unicitylabs/sphere-sdk@0.6.14':
     resolution: {integrity: sha512-7SaAK1xkDC+n3aAb+2a7XYiMk8rtd9eep3CvuKNjTmFSa+/RGPVsh4kAI00HWLsACjTOabLwjn69mQ0xWbty3g==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      ws: '>=8.0.0'
+    peerDependenciesMeta:
+      ws:
+        optional: true
+
+  '@unicitylabs/sphere-sdk@0.7.1-dev.3':
+    resolution: {integrity: sha512-LPmgS2g2bPDAwsXbK5GiVioLcwOf2Dj/K2k/ASQdXOQkhGk4IH8TVNnL4EKIP65e98n6WbzENNC5tV0uFwXybw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       ws: '>=8.0.0'
@@ -462,6 +475,11 @@ packages:
   call-bound@1.0.4:
     resolution: {integrity: sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg==}
     engines: {node: '>= 0.4'}
+
+  canonicalize@3.0.0:
+    resolution: {integrity: sha512-yYLfHyDMIXRyRqsKBRLX023riFLpXY2YOfdtqKXZRZy9qsfOJ9U+4F9YZL7MEzL5+ziN2x2nlBvY/Voi3EBljA==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   cborg@4.5.8:
     resolution: {integrity: sha512-6/viltD51JklRhq4L7jC3zgy6gryuG5xfZ3kzpE+PravtyeQLeQmCYLREhQH7pWENg5pY4Yu/XCd6a7dKScVlw==}
@@ -1171,6 +1189,14 @@ snapshots:
       '@scure/base': 1.2.6
       libphonenumber-js: 1.12.30
 
+  '@unicitylabs/nostr-js-sdk@0.5.0-dev.3':
+    dependencies:
+      '@noble/ciphers': 1.3.0
+      '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      '@scure/base': 1.2.6
+      libphonenumber-js: 1.12.30
+
   '@unicitylabs/sphere-sdk@0.6.14(ws@8.19.0)':
     dependencies:
       '@noble/curves': 2.0.1
@@ -1179,6 +1205,24 @@ snapshots:
       '@unicitylabs/state-transition-sdk': 1.6.1-rc.f37cb85
       bip39: 3.1.0
       buffer: 6.0.3
+      crypto-js: 4.2.0
+      elliptic: 6.6.1
+    optionalDependencies:
+      '@libp2p/crypto': 5.1.13
+      '@libp2p/peer-id': 6.0.4
+      ipns: 10.1.3
+      multiformats: 13.4.2
+      ws: 8.19.0
+
+  '@unicitylabs/sphere-sdk@0.7.1-dev.3(ws@8.19.0)':
+    dependencies:
+      '@noble/curves': 2.0.1
+      '@noble/hashes': 2.0.1
+      '@unicitylabs/nostr-js-sdk': 0.5.0-dev.3
+      '@unicitylabs/state-transition-sdk': 1.6.1-rc.f37cb85
+      bip39: 3.1.0
+      buffer: 6.0.3
+      canonicalize: 3.0.0
       crypto-js: 4.2.0
       elliptic: 6.6.1
     optionalDependencies:
@@ -1260,6 +1304,8 @@ snapshots:
     dependencies:
       call-bind-apply-helpers: 1.0.2
       get-intrinsic: 1.3.0
+
+  canonicalize@3.0.0: {}
 
   cborg@4.5.8:
     optional: true
