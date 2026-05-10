@@ -346,6 +346,11 @@ export class Game {
       clockMs: Math.max(0, Math.round(this.myClockMs)),
       color: m.color,
       moveNum: m.moveNum,
+      // Stamp every send (including poll resends) so receivers can subtract
+      // Nostr transit delay from the displayed bot clock. The bot's own
+      // myClockMs is frozen while it's the opponent's turn, so restamping
+      // on resend is correct: sentAtMs is "when this snapshot is current".
+      sentAtMs: Date.now(),
     });
   }
 

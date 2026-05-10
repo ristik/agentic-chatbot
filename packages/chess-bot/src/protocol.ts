@@ -59,6 +59,13 @@ export interface MoveMessage {
   /** Color of the player who made this move */
   color: 'w' | 'b';
   moveNum: number;
+  /**
+   * Optional Unix-epoch ms timestamp when the sender stamped this message.
+   * Receivers subtract (now - sentAtMs) from clockMs to compensate for
+   * Nostr DM transit delay when displaying the sender's clock. Older
+   * clients that omit this field get today's behavior (stale display).
+   */
+  sentAtMs?: number;
 }
 
 export interface ResignMessage {
@@ -190,7 +197,17 @@ export function parseMessage(raw: string): ParsedMessage | null {
       const color = parts[5];
       const moveNum = parseInt(parts[6], 10);
       if (!san || isNaN(clockMs) || (color !== 'w' && color !== 'b') || isNaN(moveNum)) return null;
-      return { action: ACTION.MOVE, gameId, san, clockMs, color, moveNum };
+      const sentAtStr = parts[7];
+      const sentAtMs = sentAtStr ? parseInt(sentAtStr, 10) : NaN;
+      return {
+        action: ACTION.MOVE,
+        gameId,
+        san,
+        clockMs,
+        color,
+        moveNum,
+        ...(isNaN(sentAtMs) ? {} : { sentAtMs }),
+      };
     }
 
     case ACTION.RESIGN:
@@ -262,8 +279,10 @@ export function encodeMessage(msg: ParsedMessage): string {
       return `${prefix}:${ACTION.ACCEPT}`;
     case ACTION.DECLINE:
       return `${prefix}:${ACTION.DECLINE}`;
-    case ACTION.MOVE:
-      return `${prefix}:${ACTION.MOVE}:${msg.san}:${msg.clockMs}:${msg.color}:${msg.moveNum}`;
+    case ACTION.MOVE: {
+      const base = `${prefix}:${ACTION.MOVE}:${msg.san}:${msg.clockMs}:${msg.color}:${msg.moveNum}`;
+      return msg.sentAtMs != null ? `${base}:${msg.sentAtMs}` : base;
+    }
     case ACTION.RESIGN:
       return `${prefix}:${ACTION.RESIGN}`;
     case ACTION.DRAW_OFFER:

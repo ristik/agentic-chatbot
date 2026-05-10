@@ -49,6 +49,26 @@ describe('protocol', () => {
       assert.equal(parseMessage('unichess:a1b2c3d4:mv:e4:298000:b'), null);
     });
 
+    it('parses move with sentAtMs and round-trips it', () => {
+      const raw = 'unichess:a1b2c3d4:mv:e4:298000:b:3:1717000000000';
+      const msg = parseMessage(raw);
+      assert.ok(msg);
+      assert.equal(msg.action, ACTION.MOVE);
+      if (msg.action !== ACTION.MOVE) return;
+      assert.equal(msg.sentAtMs, 1717000000000);
+      assert.equal(encodeMessage(msg), raw);
+    });
+
+    it('parses legacy move without sentAtMs (back-compat)', () => {
+      // Old senders never include sentAtMs — the field must be absent, not 0/NaN.
+      const msg = parseMessage('unichess:a1b2c3d4:mv:e4:298000:b:3');
+      assert.ok(msg && msg.action === ACTION.MOVE);
+      if (msg.action !== ACTION.MOVE) return;
+      assert.equal(msg.sentAtMs, undefined);
+      // Re-encoding must NOT introduce a trailing colon for an old-style message.
+      assert.equal(encodeMessage(msg), 'unichess:a1b2c3d4:mv:e4:298000:b:3');
+    });
+
     it('parses accept', () => {
       const msg = parseMessage('unichess:a1b2c3d4:ok');
       assert.ok(msg);
