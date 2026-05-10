@@ -1,7 +1,5 @@
 packages:
   - packages/*
-
-ignoredBuiltDependencies:
-  - esbuild
-onlyBuiltDependencies:
-  - stockfish
+allowBuilds:
+  esbuild: true
+  stockfish: true
