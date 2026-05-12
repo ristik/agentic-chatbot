@@ -11,10 +11,12 @@ import {
 const POLL_INTERVAL_MS = 5_000;
 /**
  * Silence threshold used once we've confirmed the opponent is a heartbeat-
- * capable client (UI sends `hb` every 5s while it's the user's turn). Six
- * missed heartbeats means they're really gone.
+ * capable client (UI sends `hb` every 5s while it's the user's turn, and
+ * also resends its last move every 5s while waiting on ours). 90 s gives
+ * plenty of headroom over relay broadcast-lag p99 while still catching
+ * real disconnects within ~1.5 min.
  */
-const OPPONENT_SILENCE_WITH_HB_MS = 30_000;
+const OPPONENT_SILENCE_WITH_HB_MS = 90_000;
 /** Grace period added to opponent's clock when they don't send heartbeats. */
 const OPPONENT_SILENCE_GRACE_MS = 30_000;
 
@@ -140,7 +142,11 @@ export class Game {
           return;
         }
         if (msg.moveNum > 0 && msg.moveNum <= this.lastAppliedOpponentMoveNum) {
-          // Opponent resent an old move — they didn't get our reply. Resend immediately.
+          // Opponent resent an old move — they didn't get our reply. A stale
+          // retry proves the opponent is online and talking to us; their UI
+          // just hasn't received our latest move yet (relay broadcast lag).
+          // Refresh activity so we don't false-disconnect a connected user.
+          this.lastOpponentActivity = Date.now();
           if (this.lastMoveSent) {
             this.log(`RECV stale mv #${msg.moveNum} — opponent missed our #${this.lastMoveSent.moveNum}, resending now`);
             this.sendMessage(this.buildMoveMsg()).catch(() => {});
