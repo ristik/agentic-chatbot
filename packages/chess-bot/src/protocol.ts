@@ -18,6 +18,15 @@ export const ACTION = {
   ABORT: 'ab',
   GAMEOVER: 'go',
   REMATCH: 'rm',
+  /**
+   * Liveness probe sent by the chess UI before requesting a deposit. The bot
+   * replies with PONG immediately if it can accept a new game, or DECLINE if
+   * it can't (at capacity, engine not ready). On 15s timeout the UI shows
+   * an error and skips the deposit entirely — much better UX than the user
+   * depositing into an unresponsive bot.
+   */
+  PING: 'pi',
+  PONG: 'po',
 } as const;
 
 export type ChallengeColor = 'w' | 'b' | 'r';
@@ -114,6 +123,16 @@ export interface RematchMessage {
   timeMinutes: number;
 }
 
+export interface PingMessage {
+  action: typeof ACTION.PING;
+  gameId: string;
+}
+
+export interface PongMessage {
+  action: typeof ACTION.PONG;
+  gameId: string;
+}
+
 export type ParsedMessage =
   | ChallengeMessage
   | AcceptMessage
@@ -126,7 +145,9 @@ export type ParsedMessage =
   | HeartbeatMessage
   | AbortMessage
   | GameOverMessage
-  | RematchMessage;
+  | RematchMessage
+  | PingMessage
+  | PongMessage;
 
 const VALID_CHALLENGE_COLORS = new Set(['w', 'b', 'r']);
 const VALID_GAMEOVER_RESULTS = new Set(['w', 'b', 'd']);
@@ -264,6 +285,12 @@ export function parseMessage(raw: string): ParsedMessage | null {
       };
     }
 
+    case ACTION.PING:
+      return { action: ACTION.PING, gameId };
+
+    case ACTION.PONG:
+      return { action: ACTION.PONG, gameId };
+
     default:
       return null;
   }
@@ -299,5 +326,9 @@ export function encodeMessage(msg: ParsedMessage): string {
       return `${prefix}:${ACTION.GAMEOVER}:${msg.result}:${msg.reason}`;
     case ACTION.REMATCH:
       return `${prefix}:${ACTION.REMATCH}:${msg.newGameId}:${msg.color}:${msg.timeMinutes}`;
+    case ACTION.PING:
+      return `${prefix}:${ACTION.PING}`;
+    case ACTION.PONG:
+      return `${prefix}:${ACTION.PONG}`;
   }
 }

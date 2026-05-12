@@ -23,6 +23,25 @@ const HANDLED_IDS_FILE = 'handled-game-ids.json';
 // days of activity.
 const HANDLED_IDS_MAX = 500;
 
+/**
+ * Drop incoming DMs whose ROOM rumor timestamp is older than this. The SDK
+ * delivers `message.timestamp = pm.timestamp * 1000` where pm.timestamp is
+ * the inner NIP-17 rumor's `created_at` (the sender's actual wall-clock
+ * time at send — NIP-17 only randomizes the outer seal/wrap, not the
+ * rumor). So this filter does correctly distinguish fresh from historical.
+ *
+ * Why we need it: even with our `filter.since = now` reconnect dance, the
+ * relay still streams ~50% of historical gift wraps because their outer
+ * created_at was randomized into the future half of the ±2d window. We
+ * decrypt them (we can't avoid that — the SDK doesn't dedupe by event id
+ * before decryption) and then drop them here.
+ *
+ * Threshold sized generously: chess UI's CHALLENGE_TIMEOUT_MS is 5 min, so
+ * any user still actively retrying has been waiting < 5 min. 10 min gives
+ * a comfortable margin for relay propagation lag and clock skew on top.
+ */
+const MAX_INCOMING_DM_AGE_MS = 600_000;
+
 // Polyfill WebSocket for Node.js (required by sphere-sdk)
 if (typeof globalThis.WebSocket === 'undefined') {
   (globalThis as Record<string, unknown>).WebSocket = WebSocket;
@@ -164,6 +183,16 @@ export class ChessBot {
       tokensDir: this.config.tokensDir,
     });
 
+    // We pass dmSince to skip the 2-day NIP-17 backfill (the SDK subtracts
+    // 2d for jitter compensation, so feeding `now + 2d` makes filter.since
+    // land at `now`). Today the SDK applies this AFTER subscribing, so it
+    // doesn't take effect on the first startup; persistent storage of
+    // last_dm_event_ts (which we clear in clearDmCursor) is what actually
+    // sticks. The rumor-timestamp filter in the message handler below is
+    // the load-bearing protection against historical replays — see
+    // MAX_INCOMING_DM_AGE_MS.
+    const futureDmSince = Math.floor(Date.now() / 1000) + 2 * 86400;
+
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
       l1: null,
@@ -171,23 +200,7 @@ export class ChessBot {
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,
       groupChat: !!this.config.groupId,
-      // Skip historical DM backfill entirely. The SDK applies the NIP-17
-      // 2-day randomization offset to whatever we pass — `filter.since =
-      // dmSince - 2d`. Passing `now + 2d` means filter.since = now, so
-      // the relay only sends events going forward.
-      //
-      // Tradeoff: ~50% of fresh DMs ship with gift-wrap created_at in the
-      // randomized past half and are silently dropped at the relay level.
-      // The protocol mitigates this: chess UI retries challenges every 5s
-      // for 5 min, the bot retries moves and DECLINEs every 5s, and the
-      // new hb DMs fire every 5s while the user is thinking. End-to-end
-      // loss after a handful of retries is well under 1%.
-      //
-      // Until the SDK gains per-event-id dedup *before* gift-wrap
-      // decryption (see sphere issue #303), this is the only way to avoid
-      // the 40-min cold-start while the SDK decrypts 2 days of relay
-      // backfill on a busy bot pubkey.
-      dmSince: Math.floor(Date.now() / 1000) + 2 * 86400,
+      dmSince: futureDmSince,
     });
 
     this.sphere = sphere;
@@ -227,26 +240,42 @@ export class ChessBot {
       console.error(`${this.tag} Initial balance check failed:`, err),
     );
 
-    // Listen for incoming DMs. We rely on the SDK's per-event-id cache
-    // (cacheMessages: true by default, persisted via autoSave) to dedupe
-    // historical replays — applying a timestamp-based stale filter here
-    // would either be redundant or, worse, falsely drop fresh DMs because
-    // NIP-17's gift-wrap layer randomizes created_at by ±2 days.
+    // Listen for incoming DMs.
+    let staleDropCount = 0;
+    let lastStaleLogAt = 0;
     sphere.communications.onDirectMessage(async (message: {
       content: string;
       senderPubkey: string;
       senderNametag?: string;
+      timestamp: number;
     }) => {
       if (message.senderPubkey === identity?.chainPubkey) return;
 
       // Only respond to unichess: protocol messages, ignore everything else
       if (!message.content.trim().startsWith('unichess:')) return;
 
+      // Drop stale DMs based on the rumor timestamp. See MAX_INCOMING_DM_AGE_MS.
+      const ageMs = Date.now() - message.timestamp;
+      if (ageMs > MAX_INCOMING_DM_AGE_MS) {
+        staleDropCount++;
+        const now = Date.now();
+        if (now - lastStaleLogAt > 5_000) {
+          console.log(
+            `${this.tag} Dropped ${staleDropCount} stale DM(s); newest ${Math.round(ageMs / 1000)}s old`,
+          );
+          staleDropCount = 0;
+          lastStaleLogAt = now;
+        }
+        return;
+      }
+
       const parsed = parseMessage(message.content);
       if (!parsed) return;
 
       try {
-        if (parsed.action === ACTION.CHALLENGE) {
+        if (parsed.action === ACTION.PING) {
+          await this.handlePing(parsed.gameId, message.senderPubkey, message.senderNametag);
+        } else if (parsed.action === ACTION.CHALLENGE) {
           await this.handleChallenge(
             parsed as ChallengeMessage,
             message.senderPubkey,
@@ -284,6 +313,39 @@ export class ChessBot {
     }
 
     console.log(`${this.tag} Ready — listening for challenges`);
+  }
+
+  /**
+   * Liveness probe handler. The chess UI sends PING before requesting a
+   * deposit so it can fail fast if the bot is unreachable or full.
+   *
+   * Reply policy:
+   *  - PONG if we can accept a new game right now (cap has room, engine
+   *    ready). The UI then proceeds with deposit + CHALLENGE.
+   *  - DECLINE if we're at capacity or engine not ready. The UI surfaces
+   *    a "bot is busy" notice and skips the deposit.
+   *
+   * No state changes here — pings don't reserve a slot, don't add to
+   * handledGameIds, don't pre-allocate anything. The actual reservation
+   * happens in handleChallenge when the deposited challenge arrives. There
+   * is a small race where a slot could be taken between PONG and the
+   * CHALLENGE, but the cap re-check in handleChallenge catches that and
+   * the UI's existing DECLINE handling refunds the deposit.
+   */
+  private async handlePing(
+    gameId: string,
+    senderPubkey: string,
+    senderNametag?: string,
+  ): Promise<void> {
+    const label = senderNametag ? `@${senderNametag}` : senderPubkey.slice(0, 12) + '...';
+    const atCap = this.games.size >= this.config.maxConcurrentGames;
+    const engineReady = !!this.engine;
+    const canAccept = !atCap && engineReady;
+    const reply = canAccept ? ACTION.PONG : ACTION.DECLINE;
+    console.log(
+      `${this.tag} PING from ${label} for ${gameId} — ${canAccept ? 'PONG' : `DECLINE (${atCap ? 'at cap' : 'engine not ready'})`}`,
+    );
+    await this.sendDM(senderPubkey, encodeMessage({ action: reply, gameId }));
   }
 
   private async handleChallenge(
