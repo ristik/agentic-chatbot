@@ -435,6 +435,23 @@ export class Game {
     this.stopPolling();
     this.onGameEnd({ gameId: this.gameId, result: null, reason: null, pgn: this.chess.pgn() });
   }
+
+  /**
+   * Bot-side resign used during graceful shutdown. Sends RESIGN to the
+   * opponent (so their UI shows a clean game-over) and ends the game
+   * with the opponent winning by 'resign' — which triggers the normal
+   * onGameEnd → handleGameEnd payout path. The opponent gets their
+   * reward; we don't leave them hanging on a disconnect.
+   */
+  async forceResign(): Promise<void> {
+    if (this.ended) return;
+    this.log('FORCE RESIGN — bot shutting down');
+    this.sendMessage(
+      encodeMessage({ action: ACTION.RESIGN, gameId: this.gameId }),
+    ).catch(() => {});
+    const opponentColor = (this.myColor === 'w' ? 'b' : 'w') as GameOverResult;
+    await this.endGame(opponentColor, 'resign');
+  }
 }
 
 function sleep(ms: number): Promise<void> {

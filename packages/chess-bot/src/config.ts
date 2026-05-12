@@ -21,6 +21,19 @@ export interface ChessBotConfig {
   coinSymbol: string;
   /** Faucet endpoint used to top up the bot's wallet */
   faucetUrl: string;
+  /**
+   * Time (ms) to wait for active games to finish naturally on shutdown.
+   * When this expires the bot resigns each remaining game (opponents win
+   * by resign, normal reward payout fires), then exits — so users get
+   * a clean game-over and their reward, not a disconnect.
+   */
+  shutdownGraceMs: number;
+  /**
+   * Additional time (ms) after forced resignation to wait for in-flight
+   * reward payouts (Sphere transfers) and group-result posts to settle.
+   * Bounded so a stuck transfer can't keep the process alive forever.
+   */
+  shutdownPayoutWaitMs: number;
 }
 
 export function loadConfig(): ChessBotConfig {
@@ -38,5 +51,7 @@ export function loadConfig(): ChessBotConfig {
     faucetUrl:
       process.env.FAUCET_URL ||
       'https://faucet.unicity.network/api/v1/faucet/request',
+    shutdownGraceMs: parseInt(process.env.SHUTDOWN_GRACE_MS || '60000', 10),
+    shutdownPayoutWaitMs: parseInt(process.env.SHUTDOWN_PAYOUT_WAIT_MS || '60000', 10),
   };
 }

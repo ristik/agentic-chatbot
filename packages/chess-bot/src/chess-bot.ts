@@ -57,6 +57,20 @@ export class ChessBot {
   private handledGameIdsPath: string;
   private paidGameIds = new Set<string>();
   private tag: string;
+  /**
+   * Set true once drain() has begun. New PINGs and CHALLENGEs are
+   * declined while this is set; existing games continue to play out
+   * normally. Existing protocol semantics already cover the "bot is
+   * busy" case via DECLINE, so the UI side requires no new logic.
+   */
+  private shuttingDown = false;
+  /**
+   * Outstanding post-game work (reward payouts, group-result posts).
+   * Tracked so drain() can wait for them to settle before tearing down
+   * Sphere — otherwise a Sphere transfer in flight gets cancelled and
+   * the opponent never receives their reward.
+   */
+  private pendingShutdownTasks = new Set<Promise<unknown>>();
 
   constructor(private config: ChessBotConfig) {
     this.tag = `[chess-bot:${config.nametag}]`;
@@ -340,10 +354,15 @@ export class ChessBot {
     const label = senderNametag ? `@${senderNametag}` : senderPubkey.slice(0, 12) + '...';
     const atCap = this.games.size >= this.config.maxConcurrentGames;
     const engineReady = !!this.engine;
-    const canAccept = !atCap && engineReady;
+    const canAccept = !this.shuttingDown && !atCap && engineReady;
     const reply = canAccept ? ACTION.PONG : ACTION.DECLINE;
+    const reason = this.shuttingDown
+      ? 'shutting down'
+      : atCap
+        ? 'at cap'
+        : 'engine not ready';
     console.log(
-      `${this.tag} PING from ${label} for ${gameId} — ${canAccept ? 'PONG' : `DECLINE (${atCap ? 'at cap' : 'engine not ready'})`}`,
+      `${this.tag} PING from ${label} for ${gameId} — ${canAccept ? 'PONG' : `DECLINE (${reason})`}`,
     );
     await this.sendDM(senderPubkey, encodeMessage({ action: reply, gameId }));
   }
@@ -360,6 +379,19 @@ export class ChessBot {
 
     if (this.handledGameIds.has(challenge.gameId)) {
       console.log(`${this.tag} Game ${challenge.gameId} already handled, ignoring duplicate challenge`);
+      return;
+    }
+
+    if (this.shuttingDown) {
+      console.log(`${this.tag} Shutting down — declining challenge ${challenge.gameId}`);
+      // In-memory only, like the at-cap path: once we're back up the same
+      // gameId should be eligible (in fact more likely — see comment below).
+      this.recordHandledGameId(challenge.gameId, false);
+      const noMsg = encodeMessage({ action: ACTION.DECLINE, gameId: challenge.gameId });
+      await this.sendDM(senderPubkey, noMsg);
+      for (const delay of [2000, 5000]) {
+        setTimeout(() => this.sendDM(senderPubkey, noMsg).catch(() => {}), delay);
+      }
       return;
     }
 
@@ -434,11 +466,15 @@ export class ChessBot {
       onGameEnd: (info) => {
         this.games.delete(info.gameId);
         console.log(`${this.tag} Game ${info.gameId} ended (${this.games.size} active)`);
-        this.handleGameEnd(info, myColor, challenge.elo, senderPubkey, senderNametag).catch((err) =>
-          console.error(`${this.tag} Post-game handling failed:`, err),
+        this.trackShutdownTask(
+          this.handleGameEnd(info, myColor, challenge.elo, senderPubkey, senderNametag).catch((err) =>
+            console.error(`${this.tag} Post-game handling failed:`, err),
+          ),
         );
-        this.postGameResult(info, label, challenge.elo, myColor).catch((err) =>
-          console.error(`${this.tag} Failed to post game result:`, err),
+        this.trackShutdownTask(
+          this.postGameResult(info, label, challenge.elo, myColor).catch((err) =>
+            console.error(`${this.tag} Failed to post game result:`, err),
+          ),
         );
       },
     });
@@ -543,8 +579,88 @@ export class ChessBot {
     console.error(`${this.tag} DM GAVE UP after 3 attempts: ${short}`);
   }
 
+  /**
+   * Register a post-game async task (reward payout, group post, etc.) so
+   * drain() can wait for it to settle before tearing down Sphere. The
+   * task is auto-removed once it resolves/rejects.
+   */
+  private trackShutdownTask(task: Promise<unknown>): void {
+    this.pendingShutdownTasks.add(task);
+    task.finally(() => this.pendingShutdownTasks.delete(task));
+  }
+
+  /**
+   * Graceful shutdown:
+   *   1. Decline new pings / challenges (shuttingDown flag).
+   *   2. Wait up to `shutdownGraceMs` for active games to finish naturally.
+   *   3. Force-resign anything still active. Opponents win by resign and
+   *      the normal payout path fires — they get their reward, not a
+   *      disconnect-claim hassle.
+   *   4. Wait up to `shutdownPayoutWaitMs` for in-flight reward transfers
+   *      and group posts to settle.
+   *   5. Tear down (destroy).
+   *
+   * Idempotent: a second drain() while already shutting down skips
+   * straight to destroy().
+   */
+  async drain(): Promise<void> {
+    if (this.shuttingDown) {
+      console.log(`${this.tag} drain() called twice — forcing destroy`);
+      await this.destroy();
+      return;
+    }
+    this.shuttingDown = true;
+    const graceMs = this.config.shutdownGraceMs;
+    const payoutWaitMs = this.config.shutdownPayoutWaitMs;
+    const startedAt = Date.now();
+    const initialActive = this.games.size;
+    console.log(
+      `${this.tag} Draining: stopped accepting new games. ${initialActive} active; grace=${Math.round(graceMs / 1000)}s, payout-wait=${Math.round(payoutWaitMs / 1000)}s`,
+    );
+
+    // Phase 1: let games finish naturally
+    while (this.games.size > 0 && Date.now() - startedAt < graceMs) {
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+
+    // Phase 2: force-resign anything still in progress so opponents get
+    // their reward instead of being abandoned mid-game.
+    if (this.games.size > 0) {
+      const remaining = [...this.games.values()];
+      console.log(
+        `${this.tag} Grace expired — resigning ${remaining.length} active game(s) and paying out`,
+      );
+      await Promise.allSettled(remaining.map((g) => g.forceResign()));
+    } else {
+      const elapsed = Math.round((Date.now() - startedAt) / 1000);
+      console.log(`${this.tag} All games finished naturally in ${elapsed}s`);
+    }
+
+    // Phase 3: wait for reward payouts and group posts to settle
+    if (this.pendingShutdownTasks.size > 0) {
+      console.log(
+        `${this.tag} Waiting up to ${Math.round(payoutWaitMs / 1000)}s for ${this.pendingShutdownTasks.size} post-game task(s) to settle`,
+      );
+      await Promise.race([
+        Promise.allSettled([...this.pendingShutdownTasks]),
+        new Promise((r) => setTimeout(r, payoutWaitMs)),
+      ]);
+      if (this.pendingShutdownTasks.size > 0) {
+        console.warn(
+          `${this.tag} ${this.pendingShutdownTasks.size} post-game task(s) still pending after payout wait — exiting anyway`,
+        );
+      }
+    }
+
+    await this.destroy();
+  }
+
+  /**
+   * Hard shutdown. Use drain() for graceful behavior; this is the force
+   * path that abandons any in-progress games via game.cleanup().
+   */
   async destroy(): Promise<void> {
-    console.log(`${this.tag} Shutting down (${this.games.size} active games)...`);
+    console.log(`${this.tag} Tearing down (${this.games.size} active games)...`);
     for (const game of this.games.values()) {
       game.cleanup();
     }

@@ -123,6 +123,8 @@ services:
       BOT_NAMETAG: ${CHESS_BOT_NAMETAG:-chess-bot}
       BOT_MNEMONIC: ${CHESS_BOT_MNEMONIC:-}
       MAX_CONCURRENT_GAMES: ${MAX_CONCURRENT_GAMES:-25}
+      SHUTDOWN_GRACE_MS: ${CHESS_BOT_SHUTDOWN_GRACE_MS:-60000}
+      SHUTDOWN_PAYOUT_WAIT_MS: ${CHESS_BOT_SHUTDOWN_PAYOUT_WAIT_MS:-60000}
       GROUP_ID: ${CHESS_BOT_GROUP_ID:-chess}
       DATA_DIR: /app/data
       TOKENS_DIR: /app/tokens
@@ -130,6 +132,10 @@ services:
     volumes:
       - ./data/chess-bot/data:/app/data
       - ./data/chess-bot/tokens:/app/tokens
+    # 1 min drain + 1 min payout wait + 30s of buffer for tear-down.
+    # Bot calls process.exit(0) on completion, so Docker normally won't
+    # need the full window — this is the SIGKILL deadline.
+    stop_grace_period: 150s
     mem_limit: 768m
     restart: unless-stopped
 
