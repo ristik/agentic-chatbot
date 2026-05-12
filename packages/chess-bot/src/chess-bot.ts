@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import WebSocket from 'ws';
-import { Sphere } from '@unicitylabs/sphere-sdk';
-import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
+import { Sphere, STORAGE_KEYS_GLOBAL } from '@unicitylabs/sphere-sdk';
+import { createNodeProviders, createFileStorageProvider } from '@unicitylabs/sphere-sdk/impl/nodejs';
 import {
   parseMessage,
   encodeMessage,
@@ -124,10 +124,39 @@ export class ChessBot {
     }
   }
 
+  /**
+   * Wipe the SDK's persisted DM cursor so every startup looks like a fresh
+   * one. Without this, the SDK resumes from the stored `last_dm_event_ts`
+   * and the relay subscription queries `(stored - 2 days)` due to NIP-17
+   * randomization — i.e. ~2 days of historical kind:1059 events get
+   * decrypted on every restart. We want startup to be fast on every boot
+   * (we accept the ~50% per-DM dropout for fresh DMs; the chess protocol
+   * retries every 5s so end-to-end loss is negligible).
+   */
+  private async clearDmCursor(): Promise<void> {
+    try {
+      const tempStorage = createFileStorageProvider({ dataDir: this.config.dataDir });
+      await tempStorage.connect();
+      // Stored key shape: `${LAST_DM_EVENT_TS}_${nostrPubkey.slice(0,16)}`.
+      // Prefix-match catches the per-pubkey suffix.
+      const keys = await tempStorage.keys(STORAGE_KEYS_GLOBAL.LAST_DM_EVENT_TS);
+      for (const key of keys) {
+        await tempStorage.remove(key);
+      }
+      await tempStorage.disconnect();
+      if (keys.length > 0) {
+        console.log(`${this.tag} Cleared ${keys.length} stored DM cursor key(s) so backfill starts at "now"`);
+      }
+    } catch (err) {
+      console.error(`${this.tag} Failed to clear DM cursor — startup may be slow:`, err);
+    }
+  }
+
   async start(): Promise<void> {
     console.log(`${this.tag} Starting...`);
 
     this.loadHandledGameIds();
+    await this.clearDmCursor();
 
     const providers = createNodeProviders({
       network: this.config.network as 'mainnet' | 'testnet',
@@ -142,12 +171,23 @@ export class ChessBot {
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,
       groupChat: !!this.config.groupId,
-      // Short DM backfill window on startup. NIP-17 randomizes gift-wrap
-      // created_at by up to ~2 days into the past, so we look back further
-      // than "real" 1 hour to catch backdated wraps. We dedupe handled
-      // gameIds via persistent state, so this only affects how much old DM
-      // traffic the SDK pulls/decrypts on a fresh start.
-      dmSince: Math.floor(Date.now() / 1000) - 3 * 3600,
+      // Skip historical DM backfill entirely. The SDK applies the NIP-17
+      // 2-day randomization offset to whatever we pass — `filter.since =
+      // dmSince - 2d`. Passing `now + 2d` means filter.since = now, so
+      // the relay only sends events going forward.
+      //
+      // Tradeoff: ~50% of fresh DMs ship with gift-wrap created_at in the
+      // randomized past half and are silently dropped at the relay level.
+      // The protocol mitigates this: chess UI retries challenges every 5s
+      // for 5 min, the bot retries moves and DECLINEs every 5s, and the
+      // new hb DMs fire every 5s while the user is thinking. End-to-end
+      // loss after a handful of retries is well under 1%.
+      //
+      // Until the SDK gains per-event-id dedup *before* gift-wrap
+      // decryption (see sphere issue #303), this is the only way to avoid
+      // the 40-min cold-start while the SDK decrypts 2 days of relay
+      // backfill on a busy bot pubkey.
+      dmSince: Math.floor(Date.now() / 1000) + 2 * 86400,
     });
 
     this.sphere = sphere;
