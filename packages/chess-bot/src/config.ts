@@ -30,7 +30,7 @@ export function loadConfig(): ChessBotConfig {
     network: process.env.NETWORK || 'testnet',
     dataDir: process.env.DATA_DIR || './data/chess-bot/data',
     tokensDir: process.env.TOKENS_DIR || './data/chess-bot/tokens',
-    maxConcurrentGames: parseInt(process.env.MAX_CONCURRENT_GAMES || '10', 10),
+    maxConcurrentGames: parseInt(process.env.MAX_CONCURRENT_GAMES || '25', 10),
     groupId: process.env.GROUP_ID || undefined,
     targetBalance: parseInt(process.env.TARGET_BALANCE || '1000', 10),
     minBalance: parseInt(process.env.MIN_BALANCE || '100', 10),

@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import WebSocket from 'ws';
 import { Sphere } from '@unicitylabs/sphere-sdk';
 import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
@@ -13,6 +15,23 @@ import { BotWallet } from './wallet.js';
 import { StockfishEngine } from './stockfish.js';
 import { rewardForElo } from './rewards.js';
 
+const HANDLED_IDS_FILE = 'handled-game-ids.json';
+// Keep at most this many recent IDs on disk. The bot's worst case is a
+// historical replay storm right after restart — we just need enough IDs
+// to cover the games we've accepted recently enough that the relay might
+// still be replaying their CHALLENGE events. A few hundred easily covers
+// days of activity.
+const HANDLED_IDS_MAX = 500;
+/**
+ * Maximum age of an incoming DM (rumor timestamp) we'll act on. NIP-17 gift
+ * wraps have randomized created_at, but `PrivateMessage.timestamp` is taken
+ * from the inner rumor — the sender's real send time. Anything older than
+ * this is a historical replay (every restart, the relay sends all
+ * kind:1059 events addressed to us) and would otherwise cause the bot to
+ * accept dead challenges or spam "no active game" log lines.
+ */
+const MAX_INCOMING_DM_AGE_MS = 120_000;
+
 // Polyfill WebSocket for Node.js (required by sphere-sdk)
 if (typeof globalThis.WebSocket === 'undefined') {
   (globalThis as Record<string, unknown>).WebSocket = WebSocket;
@@ -24,15 +43,100 @@ export class ChessBot {
   private engine: StockfishEngine | null = null;
   private games = new Map<string, Game>();
   private handledGameIds = new Set<string>();
+  private handledGameIdsOrder: string[] = [];
+  private handledGameIdsPath: string;
   private paidGameIds = new Set<string>();
   private tag: string;
 
   constructor(private config: ChessBotConfig) {
     this.tag = `[chess-bot:${config.nametag}]`;
+    this.handledGameIdsPath = path.join(config.dataDir, HANDLED_IDS_FILE);
+  }
+
+  private loadHandledGameIds(): void {
+    if (!fs.existsSync(this.handledGameIdsPath)) return;
+
+    let raw: string;
+    try {
+      raw = fs.readFileSync(this.handledGameIdsPath, 'utf8');
+    } catch (err) {
+      console.error(`${this.tag} Failed to read handled gameIds:`, err);
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      // File exists but is unparseable — almost always a crash during a
+      // previous write. Silently starting empty would re-arm the historical
+      // replay leak this file is supposed to prevent. Move the corrupt
+      // file aside (preserving it for inspection) and start fresh with a
+      // very loud log so the operator notices.
+      const aside = `${this.handledGameIdsPath}.corrupt-${Date.now()}`;
+      try {
+        fs.renameSync(this.handledGameIdsPath, aside);
+      } catch {
+        // Couldn't rename — at least don't read it again next boot.
+        try { fs.unlinkSync(this.handledGameIdsPath); } catch { /* ignore */ }
+      }
+      console.error(
+        `${this.tag} *** handled gameIds file was CORRUPT (${err}) — moved to ${aside}. Starting with empty set; historical CHALLENGE replays may be re-accepted until new games rebuild the list. ***`,
+      );
+      return;
+    }
+
+    if (!Array.isArray(parsed)) {
+      console.error(`${this.tag} handled gameIds file is not an array; ignoring`);
+      return;
+    }
+
+    for (const id of parsed) {
+      if (typeof id === 'string') {
+        this.handledGameIds.add(id);
+        this.handledGameIdsOrder.push(id);
+      }
+    }
+    console.log(`${this.tag} Loaded ${this.handledGameIds.size} handled gameIds from disk`);
+  }
+
+  /**
+   * Record a gameId as handled. We only persist when `persist` is true —
+   * i.e. for games we actually accepted and started. Declined challenges
+   * stay in-memory only so a user whose challenge was rejected at-cap can
+   * legitimately retry once the bot has freed a slot (and even survives
+   * a bot restart, since the decline entry doesn't make it to disk).
+   */
+  private recordHandledGameId(gameId: string, persist: boolean): void {
+    if (!this.handledGameIds.has(gameId)) {
+      this.handledGameIds.add(gameId);
+    }
+    if (!persist) return;
+
+    this.handledGameIdsOrder.push(gameId);
+    while (this.handledGameIdsOrder.length > HANDLED_IDS_MAX) {
+      const dropped = this.handledGameIdsOrder.shift();
+      if (dropped) this.handledGameIds.delete(dropped);
+    }
+    // Atomic write: stage to <path>.tmp then rename. rename(2) is atomic on
+    // POSIX filesystems, so a crash mid-write leaves the previous file
+    // intact rather than a truncated/corrupt one — protects the protection.
+    const tmp = `${this.handledGameIdsPath}.tmp`;
+    try {
+      fs.mkdirSync(path.dirname(this.handledGameIdsPath), { recursive: true });
+      fs.writeFileSync(tmp, JSON.stringify(this.handledGameIdsOrder), 'utf8');
+      fs.renameSync(tmp, this.handledGameIdsPath);
+    } catch (err) {
+      console.error(`${this.tag} Failed to persist handled gameIds:`, err);
+      // Best-effort cleanup of the temp file.
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+    }
   }
 
   async start(): Promise<void> {
     console.log(`${this.tag} Starting...`);
+
+    this.loadHandledGameIds();
 
     const providers = createNodeProviders({
       network: this.config.network as 'mainnet' | 'testnet',
@@ -47,8 +151,12 @@ export class ChessBot {
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,
       groupChat: !!this.config.groupId,
-      // Force DM lookback to 24h ago to avoid stale future timestamps from NIP-17 randomization
-      dmSince: Math.floor(Date.now() / 1000) - 86400,
+      // Short DM backfill window on startup. NIP-17 randomizes gift-wrap
+      // created_at by up to ~2 days into the past, so we look back further
+      // than "real" 1 hour to catch backdated wraps. We dedupe handled
+      // gameIds via persistent state, so this only affects how much old DM
+      // traffic the SDK pulls/decrypts on a fresh start.
+      dmSince: Math.floor(Date.now() / 1000) - 3 * 3600,
     });
 
     this.sphere = sphere;
@@ -89,11 +197,37 @@ export class ChessBot {
     );
 
     // Listen for incoming DMs
-    sphere.communications.onDirectMessage(async (message: { content: string; senderPubkey: string; senderNametag?: string }) => {
+    let staleDropCount = 0;
+    let lastStaleLogAt = 0;
+    sphere.communications.onDirectMessage(async (message: {
+      content: string;
+      senderPubkey: string;
+      senderNametag?: string;
+      timestamp: number;
+    }) => {
       if (message.senderPubkey === identity?.chainPubkey) return;
 
       // Only respond to unichess: protocol messages, ignore everything else
       if (!message.content.trim().startsWith('unichess:')) return;
+
+      // Drop stale DMs. The SDK's relay subscription has no `since` filter,
+      // so every restart replays every kind:1059 event addressed to us.
+      // The rumor timestamp is set by the sender to wall-clock at send time
+      // (gift-wrap created_at is randomized and unsafe to use here).
+      const ageMs = Date.now() - message.timestamp;
+      if (ageMs > MAX_INCOMING_DM_AGE_MS) {
+        staleDropCount++;
+        const now = Date.now();
+        // Batch the log so a flood of replays doesn't spam — one line per 5s.
+        if (now - lastStaleLogAt > 5_000) {
+          console.log(
+            `${this.tag} Dropped ${staleDropCount} stale DM(s); newest ${Math.round(ageMs / 1000)}s old`,
+          );
+          staleDropCount = 0;
+          lastStaleLogAt = now;
+        }
+        return;
+      }
 
       const parsed = parseMessage(message.content);
       if (!parsed) return;
@@ -153,14 +287,21 @@ export class ChessBot {
       console.log(`${this.tag} Game ${challenge.gameId} already handled, ignoring duplicate challenge`);
       return;
     }
-    this.handledGameIds.add(challenge.gameId);
 
     if (this.games.size >= this.config.maxConcurrentGames) {
       console.log(`${this.tag} Too many active games (${this.games.size}), declining`);
-      await this.sendDM(
-        senderPubkey,
-        encodeMessage({ action: ACTION.DECLINE, gameId: challenge.gameId }),
-      );
+      // In-memory only — don't persist. The challenger's UI keeps retrying
+      // this gameId while in 'awaiting-accept'; once we free up a slot
+      // (possibly after a restart), the same retry should be eligible to
+      // be accepted.
+      this.recordHandledGameId(challenge.gameId, false);
+      const noMsg = encodeMessage({ action: ACTION.DECLINE, gameId: challenge.gameId });
+      await this.sendDM(senderPubkey, noMsg);
+      // Resend in case the first DM is dropped — mirrors the ACCEPT path so
+      // the challenger's UI reliably learns the bot declined.
+      for (const delay of [2000, 5000]) {
+        setTimeout(() => this.sendDM(senderPubkey, noMsg).catch(() => {}), delay);
+      }
       return;
     }
 
@@ -187,12 +328,18 @@ export class ChessBot {
 
     if (!this.engine) {
       console.error(`${this.tag} Stockfish engine not ready — declining ${challenge.gameId}`);
-      await this.sendDM(
-        senderPubkey,
-        encodeMessage({ action: ACTION.DECLINE, gameId: challenge.gameId }),
-      );
+      this.recordHandledGameId(challenge.gameId, false);
+      const noMsg = encodeMessage({ action: ACTION.DECLINE, gameId: challenge.gameId });
+      await this.sendDM(senderPubkey, noMsg);
+      for (const delay of [2000, 5000]) {
+        setTimeout(() => this.sendDM(senderPubkey, noMsg).catch(() => {}), delay);
+      }
       return;
     }
+
+    // Going forward we treat this as accepted — persist so a restart can't
+    // re-accept the same gameId after the original game already ran.
+    this.recordHandledGameId(challenge.gameId, true);
 
     // Create and start the game
     const botName = `@${this.sphere?.identity?.nametag ?? this.config.nametag}`;

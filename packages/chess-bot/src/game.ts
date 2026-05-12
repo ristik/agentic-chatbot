@@ -9,6 +9,14 @@ import {
 } from './protocol.js';
 
 const POLL_INTERVAL_MS = 5_000;
+/**
+ * Silence threshold used once we've confirmed the opponent is a heartbeat-
+ * capable client (UI sends `hb` every 5s while it's the user's turn). Six
+ * missed heartbeats means they're really gone.
+ */
+const OPPONENT_SILENCE_WITH_HB_MS = 30_000;
+/** Grace period added to opponent's clock when they don't send heartbeats. */
+const OPPONENT_SILENCE_GRACE_MS = 30_000;
 
 export interface GameEndInfo {
   gameId: string;
@@ -58,6 +66,13 @@ export class Game {
   private lastMoveSent: { san: string; color: 'w' | 'b'; moveNum: number } | null = null;
   private ended = false;
   private lastOpponentActivity = 0;
+  /**
+   * True once we've received any hb DM from the opponent — confirms they're
+   * running a UI version that sends heartbeats while it's their turn, so we
+   * can apply a much shorter silence threshold. Old UIs never trip this and
+   * fall back to a clock-based threshold for backwards compatibility.
+   */
+  private seenOpponentHeartbeat = false;
   private timeControlMs: number;
   private sendMessage: (msg: string) => Promise<void>;
   private onGameEnd: (info: GameEndInfo) => void;
@@ -139,6 +154,7 @@ export class Game {
       case ACTION.HEARTBEAT:
         this.lastOpponentActivity = Date.now();
         this.opponentClockMs = msg.clockMs;
+        this.seenOpponentHeartbeat = true;
         break;
       case ACTION.RESIGN:
         this.log('RECV resign');
@@ -183,15 +199,19 @@ export class Game {
 
   private async handleOpponentMove(san: string, clockMs: number, moveNum: number): Promise<void> {
     this.stopPolling();
-    this.lastMoveSent = null;
     this.opponentClockMs = clockMs;
 
     try {
       this.chess.move(san);
     } catch {
-      this.log(`INVALID opponent move: ${san} — ignoring`);
+      this.log(`INVALID opponent move: ${san} — ignoring, resuming poll`);
+      // Don't clear lastMoveSent — we still want resends of our pending move.
+      // Restart polling so the disconnect timer can still evict this game.
+      this.startPolling();
       return;
     }
+
+    this.lastMoveSent = null;
 
     this.moveCount++;
     this.lastAppliedOpponentMoveNum = moveNum;
@@ -373,8 +393,19 @@ export class Game {
       const silenceMs = Date.now() - this.lastOpponentActivity;
       const silenceSec = Math.round(silenceMs / 1000);
 
-      if (silenceMs >= this.timeControlMs) {
-        this.log(`OPPONENT DISCONNECTED — ${silenceSec}s silence > ${this.timeControlMs / 1000}s limit`);
+      // New UIs send hb every 5s while it's the user's turn, so a 30s
+      // silence threshold catches disconnects fast without false-kicking
+      // a deep-thinking player. Old UIs (no hb) fall back to clock-based
+      // eviction: once the opponent's own clock would be exhausted, they
+      // must have either timed out or disconnected.
+      const silenceLimitMs = this.seenOpponentHeartbeat
+        ? OPPONENT_SILENCE_WITH_HB_MS
+        : this.opponentClockMs + OPPONENT_SILENCE_GRACE_MS;
+
+      if (silenceMs >= silenceLimitMs) {
+        this.log(
+          `OPPONENT DISCONNECTED — ${silenceSec}s silence > ${Math.round(silenceLimitMs / 1000)}s limit (${this.seenOpponentHeartbeat ? 'hb' : 'no-hb fallback'})`,
+        );
         this.endGame(this.myColor as GameOverResult, 'disconnect').catch(() => {});
         return;
       }
