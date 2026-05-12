@@ -215,6 +215,7 @@ export class ChessBot {
       mnemonic: this.config.mnemonic,
       groupChat: !!this.config.groupId,
       dmSince: futureDmSince,
+      communications: { cacheMessages: false },
     });
 
     this.sphere = sphere;
@@ -314,6 +315,24 @@ export class ChessBot {
         const groupChat = (sphere as any).groupChat;
         if (groupChat) {
           await groupChat.connect();
+          // Leave any group we got auto-joined to (e.g. general,
+          // announcements) — those member lists can be 50k+ each and bloat
+          // wallet.json to 16MB+ on every startup. Bot only needs its one
+          // configured group for posting results.
+          try {
+            const joined: Array<{ id: string }> = groupChat.getGroups?.() ?? [];
+            const unwanted = joined.filter((g) => g.id !== this.config.groupId);
+            for (const g of unwanted) {
+              try {
+                await groupChat.leaveGroup(g.id);
+                console.log(`${this.tag} Left unwanted group ${g.id}`);
+              } catch (err) {
+                console.warn(`${this.tag} Failed to leave group ${g.id}:`, err);
+              }
+            }
+          } catch (err) {
+            console.warn(`${this.tag} Failed to enumerate joined groups:`, err);
+          }
           try {
             await groupChat.joinGroup(this.config.groupId);
             console.log(`${this.tag} Joined group ${this.config.groupId}`);
