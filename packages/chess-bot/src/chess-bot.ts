@@ -22,15 +22,6 @@ const HANDLED_IDS_FILE = 'handled-game-ids.json';
 // still be replaying their CHALLENGE events. A few hundred easily covers
 // days of activity.
 const HANDLED_IDS_MAX = 500;
-/**
- * Maximum age of an incoming DM (rumor timestamp) we'll act on. NIP-17 gift
- * wraps have randomized created_at, but `PrivateMessage.timestamp` is taken
- * from the inner rumor — the sender's real send time. Anything older than
- * this is a historical replay (every restart, the relay sends all
- * kind:1059 events addressed to us) and would otherwise cause the bot to
- * accept dead challenges or spam "no active game" log lines.
- */
-const MAX_INCOMING_DM_AGE_MS = 120_000;
 
 // Polyfill WebSocket for Node.js (required by sphere-sdk)
 if (typeof globalThis.WebSocket === 'undefined') {
@@ -196,38 +187,20 @@ export class ChessBot {
       console.error(`${this.tag} Initial balance check failed:`, err),
     );
 
-    // Listen for incoming DMs
-    let staleDropCount = 0;
-    let lastStaleLogAt = 0;
+    // Listen for incoming DMs. We rely on the SDK's per-event-id cache
+    // (cacheMessages: true by default, persisted via autoSave) to dedupe
+    // historical replays — applying a timestamp-based stale filter here
+    // would either be redundant or, worse, falsely drop fresh DMs because
+    // NIP-17's gift-wrap layer randomizes created_at by ±2 days.
     sphere.communications.onDirectMessage(async (message: {
       content: string;
       senderPubkey: string;
       senderNametag?: string;
-      timestamp: number;
     }) => {
       if (message.senderPubkey === identity?.chainPubkey) return;
 
       // Only respond to unichess: protocol messages, ignore everything else
       if (!message.content.trim().startsWith('unichess:')) return;
-
-      // Drop stale DMs. The SDK's relay subscription has no `since` filter,
-      // so every restart replays every kind:1059 event addressed to us.
-      // The rumor timestamp is set by the sender to wall-clock at send time
-      // (gift-wrap created_at is randomized and unsafe to use here).
-      const ageMs = Date.now() - message.timestamp;
-      if (ageMs > MAX_INCOMING_DM_AGE_MS) {
-        staleDropCount++;
-        const now = Date.now();
-        // Batch the log so a flood of replays doesn't spam — one line per 5s.
-        if (now - lastStaleLogAt > 5_000) {
-          console.log(
-            `${this.tag} Dropped ${staleDropCount} stale DM(s); newest ${Math.round(ageMs / 1000)}s old`,
-          );
-          staleDropCount = 0;
-          lastStaleLogAt = now;
-        }
-        return;
-      }
 
       const parsed = parseMessage(message.content);
       if (!parsed) return;
