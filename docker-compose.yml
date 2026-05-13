@@ -130,8 +130,17 @@ services:
       TOKENS_DIR: /app/tokens
       NODE_OPTIONS: --max-old-space-size=512
     volumes:
-      - ./data/chess-bot/data:/app/data
       - ./data/chess-bot/tokens:/app/tokens
+    # /app/data on tmpfs: the SDK's FileStorageProvider does a
+    # writeFileSync + fsync + rename of the whole wallet.json on every
+    # inbound event (cursor updates, etc.). On EBS, each round-trip is
+    # ~5–15 ms and starves the WS reader → publish ACKs balloon to tens
+    # of seconds. RAM-backed makes each write microseconds, so the event
+    # loop keeps up. wallet.json is rebuilt from BOT_MNEMONIC on every
+    # start; handled-game-ids.json is recoverable (cacheMessages:false +
+    # dmSince=now+2d + rumor-age filter drop stale challenges).
+    tmpfs:
+      - /app/data:size=64m
     # 1 min drain + 1 min payout wait + 30s of buffer for tear-down.
     # Bot calls process.exit(0) on completion, so Docker normally won't
     # need the full window — this is the SIGKILL deadline.
