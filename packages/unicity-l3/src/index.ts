@@ -117,33 +117,58 @@ async function main() {
     }
   }
 
-  log(`Polling every ${config.pollIntervalMs}ms...`);
+  log(`Polling every ${config.pollIntervalMs}ms (max ${config.maxBlocksPerRound} blocks/shard/round)...`);
+
+  // Periodic memory instrumentation — a leak guard so unbounded working-set
+  // growth shows up in the logs/metrics early instead of as host swap-thrash.
+  const memTimer = setInterval(() => {
+    const m = process.memoryUsage();
+    const mb = (n: number) => Math.round(n / 1024 / 1024);
+    log(`mem: rss=${mb(m.rss)}MB heapUsed=${mb(m.heapUsed)}MB heapTotal=${mb(m.heapTotal)}MB external=${mb(m.external)}MB`);
+  }, 5 * 60 * 1000);
+  memTimer.unref();
 
   // Poll loop
   const poll = async () => {
     for (const shardId of shardIds) {
       try {
         const height = await aggregator.getBlockHeight(shardId);
-        const prev = lastBlock.get(shardId) || 0;
+        const prev = lastBlock.get(shardId) ?? 0;
 
         if (height <= prev) continue;
 
-        for (let blockNr = prev + 1; blockNr <= height; blockNr++) {
+        // Bound the work per round. If we're more than maxBlocksPerRound
+        // behind, skip the stale older blocks and only announce the most
+        // recent window. This stops a growing backlog from queuing an
+        // unbounded number of sendMessage calls (the runaway that drove
+        // ~5 GB working-set growth under host load — see issue #7).
+        let start = prev + 1;
+        const behind = height - prev;
+        if (behind > config.maxBlocksPerRound) {
+          start = height - config.maxBlocksPerRound + 1;
+          log(`Shard ${shardId}: ${behind} blocks behind; skipping ${start - prev - 1} stale block(s), announcing from #${start}`);
+          lastBlock.set(shardId, start - 1);
+        }
+
+        for (let blockNr = start; blockNr <= height; blockNr++) {
           try {
             const block = await aggregator.getBlock(blockNr, shardId);
-            if (!config.showEmptyBlocks && block.totalCommitments === 0) continue;
-            const shard = displayShardId(shardId);
-            const explorerUrl = `${config.explorerBaseUrl}?shard=${shardId}&block=${blockNr}`;
-            const message = `Block #${blockNr} | Shard ${shard} | ${block.totalCommitments} tx | ${explorerUrl}`;
+            if (config.showEmptyBlocks || block.totalCommitments > 0) {
+              const shard = displayShardId(shardId);
+              const explorerUrl = `${config.explorerBaseUrl}?shard=${shardId}&block=${blockNr}`;
+              const message = `Block #${blockNr} | Shard ${shard} | ${block.totalCommitments} tx | ${explorerUrl}`;
 
-            log(`Posting: ${message}`);
-            await groupChat.sendMessage(config.groupId!, message);
+              log(`Posting: ${message}`);
+              await groupChat.sendMessage(config.groupId!, message);
+            }
           } catch (err) {
             log(`Failed to process block ${blockNr} shard ${shardId}: ${err}`);
           }
+          // Advance the high-water mark per block, not per round, so an
+          // interrupted/slow round can never re-announce blocks it already
+          // posted (the duplicate `Posting: Block #N` loop in issue #7).
+          lastBlock.set(shardId, blockNr);
         }
-
-        lastBlock.set(shardId, height);
       } catch (err) {
         log(`Poll error shard ${shardId}: ${err}`);
       }
