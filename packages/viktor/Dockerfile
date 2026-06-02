@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 RUN corepack enable pnpm
 
@@ -14,7 +14,7 @@ RUN pnpm --filter @agentic/sphere-bot build
 COPY packages/viktor ./packages/viktor
 RUN pnpm --filter @agentic/viktor build
 
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 RUN corepack enable pnpm
 
