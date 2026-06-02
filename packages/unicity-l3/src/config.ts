@@ -12,6 +12,13 @@ export interface L3Config {
   maxBlocksPerRound: number;
 }
 
+/** Parse a positive integer env var, falling back when unset/empty/invalid
+ *  (NaN, ≤0) so a bad value can't silently disable a bound. */
+function posIntEnv(value: string | undefined, fallback: number): number {
+  const n = parseInt(value ?? '', 10);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
 export function loadConfig(): L3Config {
   return {
     network: (process.env.NETWORK || 'testnet') as L3Config['network'],
@@ -22,13 +29,13 @@ export function loadConfig(): L3Config {
     aggregatorUrl: process.env.AGGREGATOR_URL || 'https://goggregator-test.unicity.network/',
     explorerBaseUrl: process.env.EXPLORER_BASE_URL || 'https://unicitynetwork.github.io/smt-explorer/',
     groupId: process.env.GROUP_ID || undefined,
-    pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '60000', 10),
+    pollIntervalMs: posIntEnv(process.env.POLL_INTERVAL_MS, 60000),
     showEmptyBlocks: process.env.SHOW_EMPTY_BLOCKS === 'true',
     // Cap blocks announced per shard per round. When the bot falls behind
     // (e.g. slow publishing under host load) this bounds the work — and the
     // outbound message backlog — per round instead of looping over an
     // ever-growing range. Older blocks beyond the cap are skipped, not
     // queued, since announcing a stale backlog to the chat is pointless.
-    maxBlocksPerRound: parseInt(process.env.L3_MAX_BLOCKS_PER_ROUND || '100', 10),
+    maxBlocksPerRound: posIntEnv(process.env.L3_MAX_BLOCKS_PER_ROUND, 100),
   };
 }
