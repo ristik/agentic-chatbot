@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 RUN corepack enable pnpm
 
@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile --filter @agentic/unicity-l3...
 COPY packages/unicity-l3 ./packages/unicity-l3
 RUN pnpm --filter @agentic/unicity-l3 build
 
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 RUN corepack enable pnpm
 
