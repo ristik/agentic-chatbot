@@ -1,8 +1,18 @@
+# Cap per-container log growth so unbounded json-file logs can't fill the
+# host disk (see issue #8: one container's log reached 3.1 GB). Applied to
+# every service below via `logging: *default-logging`.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   searxng:
     image: searxng/searxng:latest
     networks:
       - internal
+    logging: *default-logging
     volumes:
       - ./data/searxng:/etc/searxng
     entrypoint: ["/bin/sh", "-c"]
@@ -34,6 +44,7 @@ services:
       SEARXNG_KEY: ${SEARXNG_KEY:-}
     mem_limit: 256m
     restart: unless-stopped
+    logging: *default-logging
 
   mcp-rag:
     build:
@@ -50,6 +61,7 @@ services:
       - ./data/mcp-rag/chromadb:/data/chromadb
     mem_limit: 512m
     restart: unless-stopped
+    logging: *default-logging
 
   kbbot:
     build:
@@ -82,6 +94,7 @@ services:
         condition: service_started
     mem_limit: 768m
     restart: unless-stopped
+    logging: *default-logging
 
   viktor:
     build:
@@ -111,6 +124,7 @@ services:
         condition: service_started
     mem_limit: 768m
     restart: unless-stopped
+    logging: *default-logging
 
   chess-bot:
     build:
@@ -147,6 +161,7 @@ services:
     stop_grace_period: 150s
     mem_limit: 768m
     restart: unless-stopped
+    logging: *default-logging
 
   unicity-l3:
     build:
@@ -171,6 +186,7 @@ services:
       - ./data/unicity-l3/tokens:/app/tokens
     mem_limit: 384m
     restart: unless-stopped
+    logging: *default-logging
 
   # Grafana Alloy: container + host metrics → Grafana Cloud Prometheus.
   # Config and credentials are provisioned by sphere-infra/aws/bots/deploy.sh
@@ -204,6 +220,7 @@ services:
       - --storage.path=/var/lib/alloy/data
     mem_limit: 256m
     restart: unless-stopped
+    logging: *default-logging
 
 networks:
   internal:
