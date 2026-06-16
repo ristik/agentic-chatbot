@@ -2,7 +2,7 @@ export interface SphereBotConfig {
   /** Bot name used for log prefixes, e.g. 'kbbot', 'viktor' */
   name: string;
   /** Sphere network */
-  network: 'mainnet' | 'testnet' | 'dev';
+  network: 'mainnet' | 'testnet' | 'testnet2' | 'dev';
   /** Sphere wallet data directory */
   dataDir: string;
   /** Sphere token storage directory */
@@ -35,13 +35,12 @@ export interface SphereBotConfig {
   maxContextChars?: number;
   /** MCP servers to connect to */
   mcpServers: Array<{ name: string; url: string }>;
-  /** Optional system prompt for responding to token transfers. If undefined, token transfers are ignored. */
-  tokenTransferPrompt?: string;
   /** Disable DM caching — messages flow through handlers but are never stored (default: true) */
   cacheMessages?: boolean;
   /** Optional oracle/aggregator overrides */
   oracle?: {
-    /** Path to trust base JSON file (e.g. './trustbase-testnet.json') */
+    /** Optional path to a trust base JSON file. Omit to use the SDK's baked-in
+     *  testnet2 trustbase (networkId 4). */
     trustBasePath?: string;
     /** Enable debug logging for oracle/aggregator operations */
     debug?: boolean;
