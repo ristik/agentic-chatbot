@@ -29,8 +29,8 @@ export function loadConfig(): L3Config {
     // testnet2 block-info aggregator for the raw block-polling client (NOT the
     // SDK oracle). NOTE: testnet2 is a fresh chain — block heights reset and
     // this host must serve /config/shards + JSON-RPC get_block_height/get_block.
-    // Override with L3_AGGREGATOR_URL if the testnet2 block aggregator differs
-    // from the gateway host.
+    // Reads AGGREGATOR_URL (docker-compose maps L3_AGGREGATOR_URL -> AGGREGATOR_URL);
+    // override it if the testnet2 block aggregator differs from the gateway host.
     aggregatorUrl: process.env.AGGREGATOR_URL || 'https://gateway.testnet2.unicity.network/',
     explorerBaseUrl: process.env.EXPLORER_BASE_URL || 'https://unicitynetwork.github.io/smt-explorer/',
     groupId: process.env.GROUP_ID || undefined,

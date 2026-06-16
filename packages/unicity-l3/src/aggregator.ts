@@ -24,16 +24,13 @@ export class AggregatorClient {
     const res = await fetch(`${this.baseUrl}/config/shards`);
     if (!res.ok) throw new Error(`Failed to fetch shards: ${res.status}`);
     // testnet2 gateway: { version, mode: 'bft-shard', bftShardPrefixes: ['000', ...] }.
-    // The prefix strings are the shardId values passed to get_block_height/get_block.
-    const data = (await res.json()) as { bftShardPrefixes?: string[]; shardIds?: number[] };
-    if (Array.isArray(data.bftShardPrefixes)) {
-      return data.bftShardPrefixes;
+    // The prefix strings are the shardId values passed to get_block_height/get_block,
+    // and are what displayShardId() decodes (base-2). testnet2-only — no legacy shape.
+    const data = (await res.json()) as { bftShardPrefixes?: string[] };
+    if (!Array.isArray(data.bftShardPrefixes)) {
+      throw new Error('Unexpected /config/shards shape (no bftShardPrefixes)');
     }
-    // Back-compat with the legacy { shardIds: number[] } shape.
-    if (Array.isArray(data.shardIds)) {
-      return data.shardIds.map((id) => String(id));
-    }
-    throw new Error('Unexpected /config/shards shape (no bftShardPrefixes/shardIds)');
+    return data.bftShardPrefixes;
   }
 
   async getBlockHeight(shardId: string): Promise<number> {

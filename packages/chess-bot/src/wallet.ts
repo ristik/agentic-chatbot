@@ -61,13 +61,16 @@ export class BotWallet {
       await TokenRegistry.waitForReady(5_000);
       const id = TokenRegistry.getInstance().getCoinIdBySymbol(this.coinSymbol);
       if (id) {
-        this.cachedCoinId = id;
-        return id;
+        // Normalize to lowercase hex once, here — mintFungibleToken requires it
+        // and getBalance()/asset.coinId are lowercase, so every consumer compares
+        // and passes the same casing.
+        this.cachedCoinId = id.toLowerCase();
+        return this.cachedCoinId;
       }
     } catch (err) {
       console.warn(`${this.tag} coinId registry lookup failed: ${err}`);
     }
-    this.cachedCoinId = UCT_COIN_ID_FALLBACK;
+    this.cachedCoinId = UCT_COIN_ID_FALLBACK; // already lowercase
     return this.cachedCoinId;
   }
 
@@ -124,7 +127,7 @@ export class BotWallet {
     // produces a finished, confirmed token locally (no faucet HTTP, no mailbox
     // receive round-trip), so the balance is available as soon as it resolves.
     const requested = Math.max(1, Math.ceil(this.targetBalance - before));
-    const coinId = (await this.getCoinId()).toLowerCase();
+    const coinId = await this.getCoinId(); // already lowercase-normalized
     const amount = await this.toSmallest(requested);
     console.log(
       `${this.tag} balance low: ${before} ${this.coinSymbol} < ${this.minBalance}. Self-minting ${requested} ${this.coinSymbol} for @${this.nametag}`,

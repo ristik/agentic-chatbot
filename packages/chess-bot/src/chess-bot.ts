@@ -192,11 +192,21 @@ export class ChessBot {
     this.loadHandledGameIds();
     await this.clearDmCursor();
 
+    // Resolve the network once and reuse it for the providers, the wallet-api
+    // client and Sphere.init, so the TokenRegistry, transports and wallet-api
+    // can never diverge. Honors the NETWORK env (config default is testnet2).
+    const network = (this.config.network || 'testnet2') as 'mainnet' | 'testnet' | 'testnet2' | 'dev';
+
+    const walletApiUrl = process.env.WALLET_API_URL;
+    if (!walletApiUrl) {
+      throw new Error('WALLET_API_URL is required: chess-bot uses the wallet-api rail for reward payouts');
+    }
+
     // Base bundle: Nostr transport (messaging / group chat / nametag), oracle
     // (aggregator + trustbase + apiKey) and storage. On the 0.9.x line `network`
-    // is required (testnet2) and the aggregator apiKey must be injected.
+    // is required; the aggregator apiKey is injected when provided.
     const base = createNodeProviders({
-      network: 'testnet2',
+      network,
       dataDir: this.config.dataDir,
       tokensDir: this.config.tokensDir,
       oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
@@ -209,8 +219,8 @@ export class ChessBot {
     // >= 22 provides a global WebSocket/fetch, so no factory is needed.
     // Fail-closed: omitting the walletApi client throws INVALID_CONFIG.
     const providers = createWalletApiProviders(base, {
-      baseUrl: process.env.WALLET_API_URL!,
-      network: 'testnet2',
+      baseUrl: walletApiUrl,
+      network,
       deviceId: process.env.WALLET_API_DEVICE_ID,
     });
 
@@ -226,7 +236,7 @@ export class ChessBot {
 
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
-      network: 'testnet2', // required: Sphere.init forwards it to configure the TokenRegistry
+      network, // required: Sphere.init forwards it to configure the TokenRegistry
       l1: null,
       autoGenerate: false,
       nametag: this.config.nametag,

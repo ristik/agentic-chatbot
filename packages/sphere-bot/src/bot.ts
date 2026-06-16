@@ -23,9 +23,10 @@ export class SphereBot {
 
     // Messaging-only bot: Nostr transport (DMs / group chat / nametag) plus the
     // oracle the v2 engine needs for the best-effort Unicity-ID mint inside
-    // registerNametag. `network` is required on 0.9.x (testnet2) and the
-    // aggregator apiKey must be injected. No wallet-api wrapper — this bot
-    // never sends or receives tokens.
+    // registerNametag. `network` is required on 0.9.x (testnet2). The aggregator
+    // apiKey is injected when provided (AGGREGATOR_KEY); testnet2 has a public
+    // default, so it is optional for this non-paying bot. No wallet-api wrapper —
+    // this bot never sends or receives tokens.
     const providers = createNodeProviders({
       network: this.config.network,
       dataDir: this.config.dataDir,
