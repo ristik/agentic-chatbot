@@ -3,6 +3,7 @@ import path from 'path';
 import WebSocket from 'ws';
 import { Sphere, STORAGE_KEYS_GLOBAL } from '@unicitylabs/sphere-sdk';
 import { createNodeProviders, createFileStorageProvider } from '@unicitylabs/sphere-sdk/impl/nodejs';
+import { createWalletApiProviders } from '@unicitylabs/sphere-sdk/impl/shared/wallet-api';
 import {
   parseMessage,
   encodeMessage,
@@ -191,10 +192,26 @@ export class ChessBot {
     this.loadHandledGameIds();
     await this.clearDmCursor();
 
-    const providers = createNodeProviders({
-      network: this.config.network as 'mainnet' | 'testnet',
+    // Base bundle: Nostr transport (messaging / group chat / nametag), oracle
+    // (aggregator + trustbase + apiKey) and storage. On the 0.9.x line `network`
+    // is required (testnet2) and the aggregator apiKey must be injected.
+    const base = createNodeProviders({
+      network: 'testnet2',
       dataDir: this.config.dataDir,
       tokensDir: this.config.tokensDir,
+      oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
+    });
+
+    // Wrap with the FULL wallet-api preset: this bot moves money (reward
+    // payouts), so assets ride the wallet-api mailbox (deposit→claim) with
+    // server inventory custody; messaging stays on Nostr. deviceId MUST be
+    // stable across restarts — it persists the rotating refresh token. Node
+    // >= 22 provides a global WebSocket/fetch, so no factory is needed.
+    // Fail-closed: omitting the walletApi client throws INVALID_CONFIG.
+    const providers = createWalletApiProviders(base, {
+      baseUrl: process.env.WALLET_API_URL!,
+      network: 'testnet2',
+      deviceId: process.env.WALLET_API_DEVICE_ID,
     });
 
     // We pass dmSince to skip the 2-day NIP-17 backfill (the SDK subtracts
@@ -209,6 +226,7 @@ export class ChessBot {
 
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
+      network: 'testnet2', // required: Sphere.init forwards it to configure the TokenRegistry
       l1: null,
       autoGenerate: false,
       nametag: this.config.nametag,
@@ -245,7 +263,6 @@ export class ChessBot {
       sphere,
       nametag: identity?.nametag ?? this.config.nametag,
       coinSymbol: this.config.coinSymbol,
-      faucetUrl: this.config.faucetUrl,
       targetBalance: this.config.targetBalance,
       minBalance: this.config.minBalance,
       tag: `${this.tag}[wallet]`,
