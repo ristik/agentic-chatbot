@@ -70,7 +70,7 @@ services:
     networks:
       - internal
     environment:
-      NETWORK: ${KBBOT_NETWORK:-testnet}
+      NETWORK: ${KBBOT_NETWORK:-testnet2}
       BOT_NAMETAG: ${KBBOT_NAMETAG:-kbbot}
       BOT_MNEMONIC: ${KBBOT_MNEMONIC:-}
       KBBOT_LLM_API_KEY: ${KBBOT_LLM_API_KEY}
@@ -81,7 +81,9 @@ services:
       DATA_DIR: /app/data
       TOKENS_DIR: /app/tokens
       MAX_HISTORY_MESSAGES: ${KBBOT_MAX_HISTORY_MESSAGES:-20}
-      TRUSTBASE_PATH: /app/trustbase-testnet.json
+      # No TRUSTBASE_PATH: rely on the SDK's baked-in testnet2 trustbase
+      # (networkId 4). The old bundled trustbase-testnet.json was networkId 3.
+      AGGREGATOR_KEY: ${AGGREGATOR_KEY:-}
       ORACLE_DEBUG: ${ORACLE_DEBUG:-true}
       NODE_OPTIONS: --max-old-space-size=512
     volumes:
@@ -103,12 +105,13 @@ services:
     networks:
       - internal
     environment:
-      NETWORK: ${VIKTOR_NETWORK:-testnet}
+      NETWORK: ${VIKTOR_NETWORK:-testnet2}
       BOT_NAMETAG: ${VIKTOR_NAMETAG:-viktor}
       BOT_MNEMONIC: ${VIKTOR_MNEMONIC:-}
       VIKTOR_LLM_API_KEY: ${VIKTOR_LLM_API_KEY:-}
       VIKTOR_LLM_MODEL: ${VIKTOR_LLM_MODEL:-gpt-oss}
       VIKTOR_LLM_BASE_URL: ${VIKTOR_LLM_BASE_URL:-}
+      AGGREGATOR_KEY: ${AGGREGATOR_KEY:-}
       MCP_RAG_URL: http://mcp-rag:3003/mcp
       MCP_WEB_URL: http://mcp-web:3002/mcp
       DATA_DIR: /app/data
@@ -133,9 +136,17 @@ services:
     networks:
       - internal
     environment:
-      NETWORK: ${CHESS_BOT_NETWORK:-testnet}
+      NETWORK: ${CHESS_BOT_NETWORK:-testnet2}
       BOT_NAMETAG: ${CHESS_BOT_NAMETAG:-chess-bot}
       BOT_MNEMONIC: ${CHESS_BOT_MNEMONIC:-}
+      # wallet-api (chess-bot is the only money-moving bot): aggregator apiKey
+      # for the v2 engine + mailbox delivery rail for reward payouts.
+      # WALLET_API_URL must be https off-loopback; the bots need outbound HTTPS
+      # egress to it. WALLET_API_DEVICE_ID is the stable device label (see the
+      # tmpfs note below for why the refresh token isn't actually persisted).
+      AGGREGATOR_KEY: ${AGGREGATOR_KEY:-}
+      WALLET_API_URL: ${WALLET_API_URL:-https://wallet-api.staging.unicity.network}
+      WALLET_API_DEVICE_ID: ${CHESS_BOT_DEVICE_ID:-chess-bot-prod-1}
       MAX_CONCURRENT_GAMES: ${MAX_CONCURRENT_GAMES:-25}
       SHUTDOWN_GRACE_MS: ${CHESS_BOT_SHUTDOWN_GRACE_MS:-60000}
       SHUTDOWN_PAYOUT_WAIT_MS: ${CHESS_BOT_SHUTDOWN_PAYOUT_WAIT_MS:-60000}
@@ -153,6 +164,13 @@ services:
     # loop keeps up. wallet.json is rebuilt from BOT_MNEMONIC on every
     # start; handled-game-ids.json is recoverable (cacheMessages:false +
     # dmSince=now+2d + rumor-age filter drop stale challenges).
+    #
+    # wallet-api note (testnet2): the wallet-api refresh token + inventory
+    # cursors also live in /app/data, so tmpfs wipes them on restart. This is an
+    # ACCEPTED tradeoff: chess-bot is payout-only and re-funds via self-mint, so
+    # it has NO incoming mailbox (no delivery seen-set to lose). A wipe costs
+    # only an automatic re-challenge sign-in plus a cheap inventory re-sync from
+    # the server (the source of truth) — cheaper than losing the perf win above.
     tmpfs:
       - /app/data:size=64m
     # 1 min drain + 1 min payout wait + 30s of buffer for tear-down.
@@ -170,10 +188,13 @@ services:
     networks:
       - internal
     environment:
-      NETWORK: ${L3_NETWORK:-testnet}
+      NETWORK: ${L3_NETWORK:-testnet2}
       BOT_NAMETAG: ${L3_NAMETAG:-unicity-l3}
       BOT_MNEMONIC: ${L3_MNEMONIC:-}
-      AGGREGATOR_URL: ${L3_AGGREGATOR_URL:-https://goggregator-test.unicity.network/}
+      AGGREGATOR_KEY: ${AGGREGATOR_KEY:-}
+      # testnet2 block-info aggregator (verify this host serves /config/shards +
+      # get_block_height/get_block; testnet2 is a fresh chain, heights reset).
+      AGGREGATOR_URL: ${L3_AGGREGATOR_URL:-https://gateway.testnet2.unicity.network/}
       EXPLORER_BASE_URL: ${L3_EXPLORER_BASE_URL:-https://unicitynetwork.github.io/smt-explorer/}
       GROUP_ID: ${L3_GROUP_ID}
       POLL_INTERVAL_MS: ${L3_POLL_INTERVAL_MS:-60000}

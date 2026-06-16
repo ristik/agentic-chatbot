@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+# NOTE (testnet2/wallet-api): the bot's data/ dir now also holds the wallet-api
+# refresh token + inventory cursors. A restored token is only valid if the SAME
+# WALLET_API_DEVICE_ID and mnemonic are used on restore (it is keyed per
+# (network, chainPubkey, deviceId)). chess-bot keeps data/ on tmpfs (not on the
+# host), so it has no data/ to back up — that is intentional (it self-mints and
+# re-challenges on each start).
+
 usage() {
   echo "Usage: $0 backup|restore <bot-name>"
   echo "  bot-name: kbbot, viktor, etc."

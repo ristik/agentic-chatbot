@@ -34,8 +34,7 @@ COPY --from=builder /app/packages/kbbot/package.json ./packages/kbbot/package.js
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod --filter @agentic/kbbot...
 
-# Copy trust base file if present
-COPY trustbase-testnet.json /app/trustbase-testnet.json
+# No trust base file: the SDK ships the testnet2 trustbase (networkId 4) baked in.
 
 WORKDIR /app/packages/kbbot
 CMD ["pnpm", "start"]
