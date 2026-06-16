@@ -8,7 +8,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@unicitylabs/sphere-sdk": "0.9.1-dev.16"
+    "@unicitylabs/sphere-sdk": "0.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
