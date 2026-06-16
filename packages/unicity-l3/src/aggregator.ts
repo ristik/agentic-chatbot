@@ -1,9 +1,9 @@
-/** Strip the leading 1-bit prefix to get the human-readable shard ID.
- *  e.g. 2 (0b10) → "0", 3 (0b11) → "1" */
+/** Human-readable shard label from a bft shard prefix.
+ *  testnet2 shard ids are N-bit binary prefixes ("000".."111"); the decimal
+ *  value of the prefix is the human shard number ("000" → "0", "111" → "7"). */
 export function displayShardId(rawId: string): string {
-  const n = parseInt(rawId);
-  const bits = n.toString(2); // e.g. "10" or "11"
-  return bits.slice(1) || '0';  // drop the leading "1" prefix
+  const n = parseInt(rawId, 2);
+  return Number.isNaN(n) ? rawId : String(n);
 }
 
 export interface BlockData {
@@ -23,8 +23,17 @@ export class AggregatorClient {
   async fetchShardIds(): Promise<string[]> {
     const res = await fetch(`${this.baseUrl}/config/shards`);
     if (!res.ok) throw new Error(`Failed to fetch shards: ${res.status}`);
-    const data = (await res.json()) as { shardIds: number[] };
-    return data.shardIds.map((id) => String(id));
+    // testnet2 gateway: { version, mode: 'bft-shard', bftShardPrefixes: ['000', ...] }.
+    // The prefix strings are the shardId values passed to get_block_height/get_block.
+    const data = (await res.json()) as { bftShardPrefixes?: string[]; shardIds?: number[] };
+    if (Array.isArray(data.bftShardPrefixes)) {
+      return data.bftShardPrefixes;
+    }
+    // Back-compat with the legacy { shardIds: number[] } shape.
+    if (Array.isArray(data.shardIds)) {
+      return data.shardIds.map((id) => String(id));
+    }
+    throw new Error('Unexpected /config/shards shape (no bftShardPrefixes/shardIds)');
   }
 
   async getBlockHeight(shardId: string): Promise<number> {

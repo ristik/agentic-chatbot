@@ -9,10 +9,14 @@ const config = loadConfig();
 const log = (msg: string) => console.log(`[unicity-l3] ${msg}`);
 
 async function initSphere() {
+  // Messaging-only bot (group-chat block poster): Nostr transport + the oracle
+  // the v2 engine needs. `network` is required on 0.9.x (testnet2) and the
+  // aggregator apiKey must be injected. No wallet-api wrapper — it moves no money.
   const providers = createNodeProviders({
     dataDir: config.dataDir,
     tokensDir: config.tokensDir,
     network: config.network,
+    oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
   });
 
   // Check if an exported wallet JSON (sphere-wallet format) is waiting to be imported
@@ -24,6 +28,7 @@ async function initSphere() {
       log('Found import-wallet.json — importing...');
       const result = await Sphere.importFromJSON({
         ...providers,
+        network: config.network, // required: every Sphere entry point must forward network
         jsonContent: raw,
         nametag: config.nametag,
         groupChat: true,
@@ -44,6 +49,7 @@ async function initSphere() {
   // Normal init — loads existing wallet or auto-generates new one
   const { sphere, created, generatedMnemonic } = await Sphere.init({
     ...providers,
+    network: config.network, // required: Sphere.init forwards it to configure the TokenRegistry
     autoGenerate: false,
     nametag: config.nametag,
     mnemonic: config.mnemonic,
@@ -57,6 +63,17 @@ async function initSphere() {
     }
   } else {
     log(`Wallet loaded. Nametag: ${config.nametag}`);
+  }
+
+  // Re-publish the Nostr nametag binding (idempotent). The binding carries over
+  // from the old testnet — it lives on Nostr, not on-chain — but re-registering
+  // ensures @name resolves on testnet2 and best-effort mints the v2 Unicity-ID
+  // token. Non-fatal: a failure here must not stop block posting.
+  try {
+    await sphere.registerNametag(config.nametag);
+    log(`Nametag @${config.nametag} ensured`);
+  } catch (err) {
+    log(`registerNametag (non-fatal): ${(err as Error)?.message ?? err}`);
   }
 
   return sphere;
