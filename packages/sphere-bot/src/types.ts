@@ -35,7 +35,8 @@ export interface SphereBotConfig {
   maxContextChars?: number;
   /** MCP servers to connect to */
   mcpServers: Array<{ name: string; url: string }>;
-  /** Disable DM caching — messages flow through handlers but are never stored (default: true) */
+  /** Cache DM messages in the SDK store. Default `true` (caching on); set `false`
+   *  to disable — messages still flow through handlers, they're just not persisted. */
   cacheMessages?: boolean;
   /** Optional oracle/aggregator overrides */
   oracle?: {
