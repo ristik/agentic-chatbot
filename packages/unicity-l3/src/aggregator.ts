@@ -12,6 +12,10 @@ export interface BlockData {
   totalCommitments: number;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class AggregatorClient {
   private readonly baseUrl: string;
   private requestId = 0;
@@ -51,19 +55,35 @@ export class AggregatorClient {
   }
 
   private async rpc(method: string, params: Record<string, unknown>): Promise<unknown> {
-    const res = await fetch(this.baseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: ++this.requestId,
-        method,
-        params,
-      }),
+    const body = JSON.stringify({
+      jsonrpc: '2.0',
+      id: ++this.requestId,
+      method,
+      params,
     });
-    if (!res.ok) throw new Error(`RPC ${method} HTTP ${res.status}`);
-    const json = (await res.json()) as { result?: unknown; error?: { message: string } };
-    if (json.error) throw new Error(`RPC ${method}: ${json.error.message}`);
-    return json.result;
+
+    // Retry transient failures (network errors / HTTP 5xx — e.g. the testnet2
+    // gateway's intermittent 502s). 4xx and JSON-RPC errors are deterministic
+    // and fail fast (marked _noRetry).
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await fetch(this.baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        });
+        if (res.status >= 500) throw new Error(`RPC ${method} HTTP ${res.status}`);
+        if (!res.ok) throw Object.assign(new Error(`RPC ${method} HTTP ${res.status}`), { _noRetry: true });
+        const json = (await res.json()) as { result?: unknown; error?: { message: string } };
+        if (json.error) throw Object.assign(new Error(`RPC ${method}: ${json.error.message}`), { _noRetry: true });
+        return json.result;
+      } catch (err) {
+        lastErr = err;
+        if ((err as { _noRetry?: boolean })?._noRetry || attempt === 3) throw err;
+        await sleep(300 * attempt);
+      }
+    }
+    throw lastErr;
   }
 }

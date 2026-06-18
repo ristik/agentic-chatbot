@@ -178,13 +178,16 @@ async function main() {
               log(`Posting: ${message}`);
               await groupChat.sendMessage(config.groupId!, message);
             }
+            // Advance the high-water mark ONLY after the block was successfully
+            // fetched and (if non-empty) posted. Advancing on failure would
+            // permanently skip a block on a transient aggregator error (e.g. a
+            // 502) — including a non-empty one. Per-block (not per-round) so an
+            // interrupted round never re-announces an already-posted block.
+            lastBlock.set(shardId, blockNr);
           } catch (err) {
-            log(`Failed to process block ${blockNr} shard ${shardId}: ${err}`);
+            log(`Failed to process block ${blockNr} shard ${shardId}: ${err} — retrying next round`);
+            break; // leave the high-water mark; resume from this block next poll
           }
-          // Advance the high-water mark per block, not per round, so an
-          // interrupted/slow round can never re-announce blocks it already
-          // posted (the duplicate `Posting: Block #N` loop in issue #7).
-          lastBlock.set(shardId, blockNr);
         }
       } catch (err) {
         log(`Poll error shard ${shardId}: ${err}`);
