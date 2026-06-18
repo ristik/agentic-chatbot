@@ -237,7 +237,6 @@ export class ChessBot {
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
       network, // required: Sphere.init forwards it to configure the TokenRegistry
-      l1: null,
       autoGenerate: false,
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,

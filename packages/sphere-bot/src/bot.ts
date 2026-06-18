@@ -44,7 +44,6 @@ export class SphereBot {
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
       network: this.config.network, // required: Sphere.init forwards it to configure the TokenRegistry
-      l1: null,
       autoGenerate: false,
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,
