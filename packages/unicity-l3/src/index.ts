@@ -172,7 +172,7 @@ async function main() {
             const block = await aggregator.getBlock(blockNr, shardId);
             if (config.showEmptyBlocks || block.totalCommitments > 0) {
               const shard = displayShardId(shardId);
-              const explorerUrl = `${config.explorerBaseUrl}?shard=${shardId}&block=${blockNr}`;
+              const explorerUrl = `${config.explorerBaseUrl}?network=${config.network}&shard=${shardId}&block=${blockNr}`;
               const message = `Block #${blockNr} | Shard ${shard} | ${block.totalCommitments} tx | ${explorerUrl}`;
 
               log(`Posting: ${message}`);
