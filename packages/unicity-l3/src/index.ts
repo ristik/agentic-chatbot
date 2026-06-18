@@ -185,8 +185,21 @@ async function main() {
             // interrupted round never re-announces an already-posted block.
             lastBlock.set(shardId, blockNr);
           } catch (err) {
-            log(`Failed to process block ${blockNr} shard ${shardId}: ${err} — retrying next round`);
-            break; // leave the high-water mark; resume from this block next poll
+            const msg = err instanceof Error ? err.message : String(err);
+            const notFound = msg.includes('block not found') || msg.includes('Failed to get block');
+            if (notFound && blockNr < height) {
+              // Permanent gap: the aggregator's height runs ahead and skips some
+              // round numbers, so this block has no data while blocks beyond it
+              // exist. Advance past it (don't wedge the shard) — there is no block
+              // to lose. Only the tip / transient (5xx) failures are retried.
+              log(`Skipping missing block ${blockNr} shard ${shardId} (gap; chain moved past it)`);
+              lastBlock.set(shardId, blockNr);
+              continue;
+            }
+            // Tip not yet committed, or a transient error: keep the high-water
+            // mark and retry this same block on the next poll (no block dropped).
+            log(`Block ${blockNr} shard ${shardId} not ready: ${msg} — retrying next round`);
+            break;
           }
         }
       } catch (err) {
