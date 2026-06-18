@@ -1,6 +1,6 @@
 # Bots → testnet2 migration / deploy notes (for infra)
 
-**What this is:** how to deploy the updated bots (`kbbot`, `viktor`, `chess-bot`, `unicity-l3`) after the migration to `@unicitylabs/sphere-sdk@0.10.1` on **testnet2**. Source: PR #12, branch `migrate/sphere-sdk-0.9.1-testnet2` (branch name predates the final version; the pinned SDK is **0.10.1**).
+**What this is:** how to deploy the updated bots (`kbbot`, `viktor`, `chess-bot`, `unicity-l3`) after the migration to `@unicitylabs/sphere-sdk@0.10.2` on **testnet2**. Source: PR #12, branch `migrate/sphere-sdk-0.9.1-testnet2` (branch name predates the final version; the pinned SDK is **0.10.2**).
 
 > ⚠️ **This is a testnet → testnet2 cutover.** Wallet **identity** carries over (same mnemonic ⇒ same `chainPubkey` + `@nametag` + Nostr history); on-chain **assets do not** (wallets start empty on testnet2). The `data/` dirs hold stale **v1 token state** and must be purged.
 
@@ -11,7 +11,7 @@
 1. **Confirm every bot's mnemonic is set in `.env`.** The bots do **not** auto-generate. After the data wipe (step 3) each bot re-creates its wallet from `*_MNEMONIC`; the same mnemonic ⇒ same `chainPubkey` + `@nametag`. A missing mnemonic = the bot refuses to start; a *changed* one = a new identity (loses the `@name`). Back up / verify: `KBBOT_MNEMONIC`, `VIKTOR_MNEMONIC`, `CHESS_BOT_MNEMONIC`, `L3_MNEMONIC`.
 2. **Provision the new secrets/env** (see §1).
 3. **Network egress:** the host needs outbound **HTTPS** to `gateway.testnet2.unicity.network` (aggregator, all bots) and `wallet-api.staging.unicity.network` (chess-bot only). Nostr relays (`wss://…unicity.network`) as before.
-4. **Lockfile is already regenerated and committed** for 0.10.1 — Docker `--frozen-lockfile` builds will succeed. Do **not** hand-edit `pnpm-lock.yaml`.
+4. **Lockfile is already regenerated and committed** for 0.10.2 — Docker `--frozen-lockfile` builds will succeed. Do **not** hand-edit `pnpm-lock.yaml`.
 
 ---
 
