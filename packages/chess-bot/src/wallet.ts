@@ -1,4 +1,4 @@
-import { Sphere, TokenRegistry, toSmallestUnit, isSphereError } from '@unicitylabs/sphere-sdk';
+import { Sphere, TokenRegistry, parseTokenAmount, isSphereError } from '@unicitylabs/sphere-sdk';
 
 // testnet2 UCT coinId (unicity-ids.testnet2.json). Fallback only — the registry
 // lookup (TokenRegistry.getCoinIdBySymbol) is preferred and authoritative.
@@ -203,6 +203,6 @@ export class BotWallet {
 
   private async toSmallest(amountUct: number): Promise<bigint> {
     const decimals = await this.getDecimals();
-    return toSmallestUnit(amountUct.toString(), decimals);
+    return parseTokenAmount(amountUct.toString(), decimals);
   }
 }
