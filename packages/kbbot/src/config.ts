@@ -23,15 +23,6 @@ const SYSTEM_PROMPT = `You are KBBot, a helpful knowledge base assistant for the
 
 const WELCOME_MESSAGE = "Hi! I'm KBBot, the Unicity knowledge base assistant. Ask me anything about Unicity, Sphere wallet, or agentic commerce!";
 
-const TOKEN_TRANSFER_PROMPT = `You are KBBot, the Unicity knowledge base assistant. A user just sent you a token transfer via the Unicity network.
-
-Your job:
-- Thank the sender for the transfer.
-- Summarize what was received (token amount, symbol, name) based on the transfer details provided.
-- If the transfer was marked as invalid, kindly explain that the token could not be verified and suggest they check their Sphere wallet or try again.
-- Be concise, friendly, and helpful.
-- Do not make up information about the token beyond what is provided.`;
-
 export function loadConfig(): SphereBotConfig {
   const llmApiKey = process.env.KBBOT_LLM_API_KEY;
   if (!llmApiKey) {
@@ -40,7 +31,7 @@ export function loadConfig(): SphereBotConfig {
 
   return {
     name: 'kbbot',
-    network: (process.env.NETWORK || 'testnet') as SphereBotConfig['network'],
+    network: (process.env.NETWORK || 'testnet2') as SphereBotConfig['network'],
     dataDir: process.env.DATA_DIR || '/app/data',
     tokensDir: process.env.TOKENS_DIR || '/app/tokens',
     nametag: process.env.BOT_NAMETAG || 'kbbot',
@@ -62,7 +53,6 @@ export function loadConfig(): SphereBotConfig {
       { name: 'rag', url: process.env.MCP_RAG_URL || 'http://mcp-rag:3003/mcp' },
       // { name: 'web', url: process.env.MCP_WEB_URL || 'http://mcp-web:3002/mcp' },
     ],
-    tokenTransferPrompt: TOKEN_TRANSFER_PROMPT,
     oracle: {
       trustBasePath: process.env.TRUSTBASE_PATH || undefined,
       debug: process.env.ORACLE_DEBUG === 'true',

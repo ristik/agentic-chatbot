@@ -1,16 +1,15 @@
-import { Sphere, TokenRegistry, toSmallestUnit } from '@unicitylabs/sphere-sdk';
+import { Sphere, TokenRegistry, parseTokenAmount, isSphereError } from '@unicitylabs/sphere-sdk';
 
+// testnet2 UCT coinId (unicity-ids.testnet2.json). Fallback only — the registry
+// lookup (TokenRegistry.getCoinIdBySymbol) is preferred and authoritative.
 const UCT_COIN_ID_FALLBACK =
-  '455ad8720656b08e8dbd5bac1f3c73eeea5431565f6c1c3af742b1aa12d41d89';
+  'f581d30f593e4b369d684a4563b5246f07b1d265f7178a2c0a82b81f39c24dc0';
 const UCT_DECIMALS_FALLBACK = 18;
-const TOPUP_POLL_INTERVAL_MS = 3_000;
-const TOPUP_POLL_MAX_ATTEMPTS = 40;
 
 export interface BotWalletOptions {
   sphere: Sphere;
   nametag: string;
   coinSymbol: string;
-  faucetUrl: string;
   /** Total balance the wallet aims for after a top-up (whole UCT). */
   targetBalance: number;
   /** Minimum balance below which top-up is triggered (whole UCT). */
@@ -30,7 +29,6 @@ export class BotWallet {
   private readonly sphere: Sphere;
   private readonly nametag: string;
   private readonly coinSymbol: string;
-  private readonly faucetUrl: string;
   private readonly targetBalance: number;
   private readonly minBalance: number;
   private readonly tag: string;
@@ -42,7 +40,6 @@ export class BotWallet {
     this.sphere = opts.sphere;
     this.nametag = opts.nametag.replace(/^@/, '');
     this.coinSymbol = opts.coinSymbol;
-    this.faucetUrl = opts.faucetUrl;
     this.targetBalance = opts.targetBalance;
     this.minBalance = opts.minBalance;
     this.tag = opts.tag ?? '[bot-wallet]';
@@ -64,13 +61,16 @@ export class BotWallet {
       await TokenRegistry.waitForReady(5_000);
       const id = TokenRegistry.getInstance().getCoinIdBySymbol(this.coinSymbol);
       if (id) {
-        this.cachedCoinId = id;
-        return id;
+        // Normalize to lowercase hex once, here — mintFungibleToken requires it
+        // and getBalance()/asset.coinId are lowercase, so every consumer compares
+        // and passes the same casing.
+        this.cachedCoinId = id.toLowerCase();
+        return this.cachedCoinId;
       }
     } catch (err) {
       console.warn(`${this.tag} coinId registry lookup failed: ${err}`);
     }
-    this.cachedCoinId = UCT_COIN_ID_FALLBACK;
+    this.cachedCoinId = UCT_COIN_ID_FALLBACK; // already lowercase
     return this.cachedCoinId;
   }
 
@@ -104,8 +104,8 @@ export class BotWallet {
   }
 
   /**
-   * If balance falls under {@link minBalance}, request enough UCT from the faucet
-   * to bring the balance up to {@link targetBalance}. De-duplicates concurrent calls.
+   * If balance falls under {@link minBalance}, self-mint enough UCT to bring the
+   * balance up to {@link targetBalance}. De-duplicates concurrent calls.
    */
   async ensureBalance(): Promise<boolean> {
     if (this.topUpInFlight) return this.topUpInFlight;
@@ -122,41 +122,32 @@ export class BotWallet {
       return true;
     }
 
+    // On testnet2 the wallet starts empty and there is no faucet step: re-fund
+    // from zero by SELF-MINTING via the v2 token engine. mintFungibleToken
+    // produces a finished, confirmed token locally (no faucet HTTP, no mailbox
+    // receive round-trip), so the balance is available as soon as it resolves.
     const requested = Math.max(1, Math.ceil(this.targetBalance - before));
+    const coinId = await this.getCoinId(); // already lowercase-normalized
+    const amount = await this.toSmallest(requested);
     console.log(
-      `${this.tag} balance low: ${before} ${this.coinSymbol} < ${this.minBalance}. Requesting ${requested} from faucet for @${this.nametag}`,
+      `${this.tag} balance low: ${before} ${this.coinSymbol} < ${this.minBalance}. Self-minting ${requested} ${this.coinSymbol} for @${this.nametag}`,
     );
 
-    const ok = await this.callFaucet(requested);
-    if (!ok) {
-      console.error(`${this.tag} faucet request failed`);
+    try {
+      const result = await this.sphere.payments.mintFungibleToken(coinId, amount);
+      if (!result.success) {
+        console.error(`${this.tag} self-mint failed: ${result.error}`);
+        return false;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`${this.tag} self-mint threw: ${msg}`);
       return false;
     }
 
-    // Faucet confirms async — wait for the transfer to settle in our wallet.
-    const targetSmallest = await this.toSmallest(this.minBalance);
-    for (let attempt = 1; attempt <= TOPUP_POLL_MAX_ATTEMPTS; attempt++) {
-      try {
-        await this.sphere.payments.receive({ finalize: true });
-      } catch (err) {
-        console.warn(`${this.tag} receive() failed (attempt ${attempt}): ${err}`);
-      }
-      const coinId = await this.getCoinId();
-      const assets = this.sphere.payments.getBalance(coinId) as AssetSummary[];
-      const asset = assets.find((a) => a.coinId === coinId);
-      const total = asset ? BigInt(asset.totalAmount) : 0n;
-      if (total >= targetSmallest) {
-        const after = await this.getBalanceUct();
-        console.log(`${this.tag} balance after top-up: ${after} ${this.coinSymbol}`);
-        return true;
-      }
-      await sleep(TOPUP_POLL_INTERVAL_MS);
-    }
-
-    console.error(
-      `${this.tag} top-up did not settle after ${TOPUP_POLL_MAX_ATTEMPTS * TOPUP_POLL_INTERVAL_MS / 1000}s`,
-    );
-    return false;
+    const after = await this.getBalanceUct();
+    console.log(`${this.tag} balance after self-mint: ${after} ${this.coinSymbol}`);
+    return after >= this.minBalance;
   }
 
   /**
@@ -197,6 +188,13 @@ export class BotWallet {
       );
       return { ok: true };
     } catch (err) {
+      // A recipient who has never published a chain pubkey is unsendable under
+      // the v2 send gate — surface it clearly instead of as a generic failure.
+      if (isSphereError(err) && err.code === 'INVALID_RECIPIENT') {
+        const msg = `recipient ${recipient} has no published chain pubkey (unsendable)`;
+        console.error(`${this.tag} reward send failed: ${msg}`);
+        return { ok: false, error: msg };
+      }
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`${this.tag} reward send failed: ${msg}`);
       return { ok: false, error: msg };
@@ -205,34 +203,6 @@ export class BotWallet {
 
   private async toSmallest(amountUct: number): Promise<bigint> {
     const decimals = await this.getDecimals();
-    return toSmallestUnit(amountUct.toString(), decimals);
+    return parseTokenAmount(amountUct.toString(), decimals);
   }
-
-  private async callFaucet(amount: number): Promise<boolean> {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const response = await fetch(this.faucetUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            unicityId: this.nametag,
-            coin: 'unicity',
-            amount,
-          }),
-        });
-        if (response.ok) return true;
-        const text = await response.text().catch(() => '');
-        console.warn(
-          `${this.tag} faucet HTTP ${response.status} (attempt ${attempt}): ${text.slice(0, 200)}`,
-        );
-      } catch (err) {
-        console.warn(`${this.tag} faucet error (attempt ${attempt}): ${err}`);
-      }
-    }
-    return false;
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

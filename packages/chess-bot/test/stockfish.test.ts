@@ -31,12 +31,12 @@ describe('StockfishEngine', () => {
     }
   });
 
-  it('post-init fetch reaches the testnet aggregator', async (t) => {
+  it('post-init fetch reaches the testnet2 aggregator', async (t) => {
     // Beyond the identity check above: actually exercise fetch against the
     // network. The SDK's JsonRpcHttpTransport calls bare `fetch(...)` (no
     // captured reference), so a direct fetch from this test resolves the same
     // global the SDK does — equivalent today.
-    const baseUrl = process.env.AGGREGATOR_URL || 'https://goggregator-test.unicity.network';
+    const baseUrl = process.env.AGGREGATOR_URL || 'https://gateway.testnet2.unicity.network';
     const healthUrl = baseUrl.replace(/\/$/, '') + '/health';
 
     const engine = new StockfishEngine();

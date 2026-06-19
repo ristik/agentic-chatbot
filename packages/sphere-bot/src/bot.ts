@@ -1,6 +1,5 @@
-import { Sphere, toHumanReadable } from '@unicitylabs/sphere-sdk';
+import { Sphere } from '@unicitylabs/sphere-sdk';
 import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
-import type { IncomingTransfer } from '@unicitylabs/sphere-sdk';
 import type { ModelMessage } from 'ai';
 import type { SphereBotConfig } from './types.js';
 import type { SphereBotAgent } from './agent.js';
@@ -22,22 +21,29 @@ export class SphereBot {
     console.log(`${this.prefix} Starting...`);
     console.log(`${this.prefix} Creating providers (network=${this.config.network}, dataDir=${this.config.dataDir})...`);
 
+    // Messaging-only bot: Nostr transport (DMs / group chat / nametag) plus the
+    // oracle the v2 engine needs for the best-effort Unicity-ID mint inside
+    // registerNametag. `network` is required on 0.9.x (testnet2). The aggregator
+    // apiKey is injected when provided (AGGREGATOR_KEY); testnet2 has a public
+    // default, so it is optional for this non-paying bot. No wallet-api wrapper —
+    // this bot never sends or receives tokens.
     const providers = createNodeProviders({
       network: this.config.network,
       dataDir: this.config.dataDir,
       tokensDir: this.config.tokensDir,
-      ...(this.config.oracle ? {
-        oracle: {
-          trustBasePath: this.config.oracle.trustBasePath,
-          debug: this.config.oracle.debug,
-        },
-      } : {}),
+      oracle: {
+        apiKey: process.env.AGGREGATOR_KEY || undefined,
+        ...(this.config.oracle?.trustBasePath
+          ? { trustBasePath: this.config.oracle.trustBasePath }
+          : {}),
+        debug: this.config.oracle?.debug,
+      },
     });
     console.log(`${this.prefix} Providers created, calling Sphere.init()...`);
 
     const { sphere, created, generatedMnemonic } = await Sphere.init({
       ...providers,
-      l1: null,
+      network: this.config.network, // required: Sphere.init forwards it to configure the TokenRegistry
       autoGenerate: false,
       nametag: this.config.nametag,
       mnemonic: this.config.mnemonic,
@@ -141,71 +147,6 @@ export class SphereBot {
     });
 
     console.log(`${this.prefix} Listening for DMs`);
-
-    // Token transfer handling (opt-in via tokenTransferPrompt)
-    if (this.config.tokenTransferPrompt) {
-      this.setupTokenTransferListeners(sphere);
-    }
-  }
-
-  private setupTokenTransferListeners(sphere: Sphere): void {
-    const identity = sphere.identity!;
-
-    // 1) Listen for VALID transfers (after SDK validation + finalization)
-    sphere.on('transfer:incoming', (transfer: IncomingTransfer) => {
-      if (transfer.senderPubkey === identity.chainPubkey) return;
-
-      const tokenSummaries = transfer.tokens.map(t => {
-        const human = toHumanReadable(t.amount, t.decimals);
-        return `${human} ${t.symbol} (${t.name})`;
-      }).join(', ');
-
-      const senderLabel = transfer.senderNametag
-        ? `@${transfer.senderNametag}`
-        : transfer.senderPubkey.slice(0, 16) + '...';
-
-      console.log(`${this.prefix} Valid token transfer from ${senderLabel}: ${tokenSummaries}`);
-
-      const context = [
-        `TOKEN TRANSFER RECEIVED (valid)`,
-        `From: ${senderLabel}`,
-        `Tokens: ${tokenSummaries}`,
-        transfer.memo ? `Memo: ${transfer.memo}` : null,
-      ].filter(Boolean).join('\n');
-
-      this.handleTransferReply(sphere, transfer.senderPubkey, context).catch(err =>
-        console.error(`${this.prefix} Error replying to valid transfer:`, err)
-      );
-    });
-
-    console.log(`${this.prefix} Listening for token transfers`);
-  }
-
-  private async handleTransferReply(sphere: Sphere, senderPubkey: string, transferContext: string): Promise<void> {
-    const transferPrompt = this.config.tokenTransferPrompt!;
-
-    const sendComposing = () =>
-      sphere.communications.sendComposingIndicator(senderPubkey).catch(() => {});
-    await sendComposing();
-    const composingInterval = setInterval(sendComposing, 1000);
-
-    const history = this.getHistory(senderPubkey);
-
-    let response: string;
-    try {
-      response = await this.agent.respondToTransfer(transferPrompt, transferContext, history);
-    } finally {
-      clearInterval(composingInterval);
-    }
-
-    console.log(`${this.prefix} Transfer response (${response.length} chars): ${response.slice(0, 200)}`);
-
-    // Store in conversation history so future DMs have context
-    this.addToHistory(senderPubkey, 'user', `[Token transfer: ${transferContext}]`);
-    this.addToHistory(senderPubkey, 'assistant', response);
-
-    const sent = await sphere.communications.sendDM(senderPubkey, response);
-    console.log(`${this.prefix} Sent transfer reply, msgId=${sent.id}`);
   }
 
   async destroy(): Promise<void> {

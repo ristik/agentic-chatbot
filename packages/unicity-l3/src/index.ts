@@ -9,10 +9,14 @@ const config = loadConfig();
 const log = (msg: string) => console.log(`[unicity-l3] ${msg}`);
 
 async function initSphere() {
+  // Messaging-only bot (group-chat block poster): Nostr transport + the oracle
+  // the v2 engine needs. `network` is required on 0.9.x (testnet2) and the
+  // aggregator apiKey must be injected. No wallet-api wrapper — it moves no money.
   const providers = createNodeProviders({
     dataDir: config.dataDir,
     tokensDir: config.tokensDir,
     network: config.network,
+    oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
   });
 
   // Check if an exported wallet JSON (sphere-wallet format) is waiting to be imported
@@ -24,6 +28,7 @@ async function initSphere() {
       log('Found import-wallet.json — importing...');
       const result = await Sphere.importFromJSON({
         ...providers,
+        network: config.network, // required: every Sphere entry point must forward network
         jsonContent: raw,
         nametag: config.nametag,
         groupChat: true,
@@ -44,6 +49,7 @@ async function initSphere() {
   // Normal init — loads existing wallet or auto-generates new one
   const { sphere, created, generatedMnemonic } = await Sphere.init({
     ...providers,
+    network: config.network, // required: Sphere.init forwards it to configure the TokenRegistry
     autoGenerate: false,
     nametag: config.nametag,
     mnemonic: config.mnemonic,
@@ -57,6 +63,17 @@ async function initSphere() {
     }
   } else {
     log(`Wallet loaded. Nametag: ${config.nametag}`);
+  }
+
+  // Re-publish the Nostr nametag binding (idempotent). The binding carries over
+  // from the old testnet — it lives on Nostr, not on-chain — but re-registering
+  // ensures @name resolves on testnet2 and best-effort mints the v2 Unicity-ID
+  // token. Non-fatal: a failure here must not stop block posting.
+  try {
+    await sphere.registerNametag(config.nametag);
+    log(`Nametag @${config.nametag} ensured`);
+  } catch (err) {
+    log(`registerNametag (non-fatal): ${(err as Error)?.message ?? err}`);
   }
 
   return sphere;
@@ -155,19 +172,35 @@ async function main() {
             const block = await aggregator.getBlock(blockNr, shardId);
             if (config.showEmptyBlocks || block.totalCommitments > 0) {
               const shard = displayShardId(shardId);
-              const explorerUrl = `${config.explorerBaseUrl}?shard=${shardId}&block=${blockNr}`;
+              const explorerUrl = `${config.explorerBaseUrl}?network=${config.network}&shard=${shardId}&block=${blockNr}`;
               const message = `Block #${blockNr} | Shard ${shard} | ${block.totalCommitments} tx | ${explorerUrl}`;
 
               log(`Posting: ${message}`);
               await groupChat.sendMessage(config.groupId!, message);
             }
+            // Advance the high-water mark ONLY after the block was successfully
+            // fetched and (if non-empty) posted. Advancing on failure would
+            // permanently skip a block on a transient aggregator error (e.g. a
+            // 502) — including a non-empty one. Per-block (not per-round) so an
+            // interrupted round never re-announces an already-posted block.
+            lastBlock.set(shardId, blockNr);
           } catch (err) {
-            log(`Failed to process block ${blockNr} shard ${shardId}: ${err}`);
+            const msg = err instanceof Error ? err.message : String(err);
+            const notFound = msg.includes('block not found') || msg.includes('Failed to get block');
+            if (notFound && blockNr < height) {
+              // Permanent gap: the aggregator's height runs ahead and skips some
+              // round numbers, so this block has no data while blocks beyond it
+              // exist. Advance past it (don't wedge the shard) — there is no block
+              // to lose. Only the tip / transient (5xx) failures are retried.
+              log(`Skipping missing block ${blockNr} shard ${shardId} (gap; chain moved past it)`);
+              lastBlock.set(shardId, blockNr);
+              continue;
+            }
+            // Tip not yet committed, or a transient error: keep the high-water
+            // mark and retry this same block on the next poll (no block dropped).
+            log(`Block ${blockNr} shard ${shardId} not ready: ${msg} — retrying next round`);
+            break;
           }
-          // Advance the high-water mark per block, not per round, so an
-          // interrupted/slow round can never re-announce blocks it already
-          // posted (the duplicate `Posting: Block #N` loop in issue #7).
-          lastBlock.set(shardId, blockNr);
         }
       } catch (err) {
         log(`Poll error shard ${shardId}: ${err}`);

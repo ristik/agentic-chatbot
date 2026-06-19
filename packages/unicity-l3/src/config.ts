@@ -1,5 +1,5 @@
 export interface L3Config {
-  network: 'mainnet' | 'testnet' | 'dev';
+  network: 'mainnet' | 'testnet' | 'testnet2' | 'dev';
   nametag: string;
   mnemonic?: string;
   dataDir: string;
@@ -21,12 +21,17 @@ function posIntEnv(value: string | undefined, fallback: number): number {
 
 export function loadConfig(): L3Config {
   return {
-    network: (process.env.NETWORK || 'testnet') as L3Config['network'],
+    network: (process.env.NETWORK || 'testnet2') as L3Config['network'],
     nametag: process.env.BOT_NAMETAG || 'unicity-l3',
     mnemonic: process.env.BOT_MNEMONIC || undefined,
     dataDir: process.env.DATA_DIR || '/app/data',
     tokensDir: process.env.TOKENS_DIR || '/app/tokens',
-    aggregatorUrl: process.env.AGGREGATOR_URL || 'https://goggregator-test.unicity.network/',
+    // testnet2 block-info aggregator for the raw block-polling client (NOT the
+    // SDK oracle). NOTE: testnet2 is a fresh chain — block heights reset and
+    // this host must serve /config/shards + JSON-RPC get_block_height/get_block.
+    // Reads AGGREGATOR_URL (docker-compose maps L3_AGGREGATOR_URL -> AGGREGATOR_URL);
+    // override it if the testnet2 block aggregator differs from the gateway host.
+    aggregatorUrl: process.env.AGGREGATOR_URL || 'https://gateway.testnet2.unicity.network/',
     explorerBaseUrl: process.env.EXPLORER_BASE_URL || 'https://unicitynetwork.github.io/smt-explorer/',
     groupId: process.env.GROUP_ID || undefined,
     pollIntervalMs: posIntEnv(process.env.POLL_INTERVAL_MS, 60000),
