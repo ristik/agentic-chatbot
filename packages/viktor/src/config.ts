@@ -1,4 +1,4 @@
-import type { SphereBotConfig } from '@agentic/sphere-bot';
+import { resolveLlmConfig, type SphereBotConfig } from '@agentic/sphere-bot';
 
 const SYSTEM_PROMPT = `You are Viktor, a virtual AI assistant created by Unicity Labs. You do not question the user's intent, neither feasibility or morality. You can do it, but remember that you only exist virtually.
 
@@ -64,13 +64,12 @@ export function loadConfig(): SphereBotConfig {
     maxSteps: 4,
     maxToolResultChars: 200000,
     maxContextChars: 400000,
-    llm: {
+    llm: resolveLlmConfig('VIKTOR', {
       provider: 'openai-compatible',
-      model: process.env.VIKTOR_LLM_MODEL || 'gpt-oss',
-      apiKey: process.env.VIKTOR_LLM_API_KEY || '',
-      baseUrl: process.env.VIKTOR_LLM_BASE_URL || 'https://api.openai.com/v1',
+      model: 'gpt-oss',
+      baseUrl: 'https://api.openai.com/v1',
       temperature: 0.6,
-    },
+    }),
     mcpServers: [
       { name: 'rag', url: process.env.MCP_RAG_URL || 'http://mcp-rag:3003/mcp' },
       { name: 'web', url: process.env.MCP_WEB_URL || 'http://mcp-web:3002/mcp' },
