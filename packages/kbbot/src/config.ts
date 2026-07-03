@@ -44,10 +44,10 @@ export function loadConfig(): SphereBotConfig {
     maxToolResultChars: 160000,
     maxContextChars: 500000,
     llm: {
-      provider: 'google',
-      model: process.env.KBBOT_LLM_MODEL || 'gemini-3-flash-preview',
+      provider: 'openai-compatible',
+      model: process.env.KBBOT_LLM_MODEL || 'Gemma-4-31B-it',
       apiKey: llmApiKey,
-      baseUrl: process.env.KBBOT_LLM_BASE_URL || undefined,
+      baseUrl: process.env.KBBOT_LLM_BASE_URL || 'https://api.arliai.com/v1',
     },
     mcpServers: [
       { name: 'rag', url: process.env.MCP_RAG_URL || 'http://mcp-rag:3003/mcp' },

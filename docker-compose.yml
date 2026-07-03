@@ -74,8 +74,8 @@ services:
       BOT_NAMETAG: ${KBBOT_NAMETAG:-kbbot}
       BOT_MNEMONIC: ${KBBOT_MNEMONIC:-}
       KBBOT_LLM_API_KEY: ${KBBOT_LLM_API_KEY}
-      KBBOT_LLM_MODEL: ${KBBOT_LLM_MODEL:-gemini-3-flash-preview}
-      KBBOT_LLM_BASE_URL: ${KBBOT_LLM_BASE_URL:-}
+      KBBOT_LLM_MODEL: ${KBBOT_LLM_MODEL:-Gemma-4-31B-it}
+      KBBOT_LLM_BASE_URL: ${KBBOT_LLM_BASE_URL:-https://api.arliai.com/v1}
       MCP_RAG_URL: http://mcp-rag:3003/mcp
       MCP_WEB_URL: http://mcp-web:3002/mcp
       DATA_DIR: /app/data
