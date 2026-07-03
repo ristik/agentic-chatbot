@@ -38,6 +38,13 @@ export interface SphereBotConfig {
   /** Cache DM messages in the SDK store. Default `true` (caching on); set `false`
    *  to disable — messages still flow through handlers, they're just not persisted. */
   cacheMessages?: boolean;
+  /** Sender pubkeys (64-char hex) and/or @nametags to silently ignore — no
+   *  reply, no LLM call. Silent by design so it can't feed bot-to-bot loops. */
+  blocklist?: string[];
+  /** Per-sender inbound DM rate limit; over-limit messages are dropped
+   *  silently. Defaults to 20 msgs / 60s when omitted (set maxPerWindow<=0
+   *  to disable). */
+  rateLimit?: { maxPerWindow: number; windowMs: number };
   /** Optional oracle/aggregator overrides */
   oracle?: {
     /** Optional path to a trust base JSON file. Omit to use the SDK's baked-in

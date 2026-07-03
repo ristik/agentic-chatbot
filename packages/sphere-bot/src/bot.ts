@@ -3,6 +3,12 @@ import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
 import type { ModelMessage } from 'ai';
 import type { SphereBotConfig } from './types.js';
 import type { SphereBotAgent } from './agent.js';
+import { DmGuard } from './dm-guard.js';
+
+/** Default per-sender inbound DM rate limit (silent drop over the cap):
+ *  30 messages / 5 min — catches a sustained flooder/loop while still allowing
+ *  a legitimate burst. Per-bot overridable via config.rateLimit (env-tunable). */
+const DEFAULT_RATE_LIMIT = { maxPerWindow: 30, windowMs: 300_000 };
 
 export class SphereBot {
   private sphere: Sphere | null = null;
@@ -10,11 +16,16 @@ export class SphereBot {
   private agent: SphereBotAgent;
   private conversations: Map<string, ModelMessage[]> = new Map();
   private prefix: string;
+  private guard: DmGuard;
 
   constructor(config: SphereBotConfig, agent: SphereBotAgent) {
     this.config = config;
     this.agent = agent;
     this.prefix = `[Bot:${config.name}]`;
+    this.guard = new DmGuard({
+      blocklist: config.blocklist,
+      rateLimit: config.rateLimit ?? DEFAULT_RATE_LIMIT,
+    });
   }
 
   async start(): Promise<void> {
@@ -89,6 +100,16 @@ export class SphereBot {
       // Ignore our own messages
       if (message.senderPubkey === identity.chainPubkey) {
         console.log(`${this.prefix} Ignoring own message`);
+        return;
+      }
+
+      // Blocklist / rate-limit: drop SILENTLY — never reply. A reply would feed
+      // bot-to-bot reply loops and burn LLM tokens on abusive/looping senders.
+      const decision = this.guard.check(message.senderPubkey, message.senderNametag, Date.now());
+      if (!decision.allowed) {
+        if (decision.log) {
+          console.warn(`${this.prefix} Dropping DM from ${label} (${decision.reason})`);
+        }
         return;
       }
 

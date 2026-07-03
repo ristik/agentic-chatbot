@@ -78,6 +78,9 @@ services:
       KBBOT_LLM_MODEL: ${KBBOT_LLM_MODEL:-Gemma-4-31B-it}
       KBBOT_LLM_BASE_URL: ${KBBOT_LLM_BASE_URL:-https://api.arliai.com/v1}
       KBBOT_LLM_TEMPERATURE: ${KBBOT_LLM_TEMPERATURE:-}
+      KBBOT_BLOCKLIST: ${KBBOT_BLOCKLIST:-}
+      KBBOT_RATE_LIMIT_MAX: ${KBBOT_RATE_LIMIT_MAX:-}
+      KBBOT_RATE_LIMIT_WINDOW_SEC: ${KBBOT_RATE_LIMIT_WINDOW_SEC:-}
       MCP_RAG_URL: http://mcp-rag:3003/mcp
       MCP_WEB_URL: http://mcp-web:3002/mcp
       DATA_DIR: /app/data
