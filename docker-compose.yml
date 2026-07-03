@@ -73,9 +73,11 @@ services:
       NETWORK: ${KBBOT_NETWORK:-testnet2}
       BOT_NAMETAG: ${KBBOT_NAMETAG:-kbbot}
       BOT_MNEMONIC: ${KBBOT_MNEMONIC:-}
+      KBBOT_LLM_PROVIDER: ${KBBOT_LLM_PROVIDER:-openai-compatible}
       KBBOT_LLM_API_KEY: ${KBBOT_LLM_API_KEY}
-      KBBOT_LLM_MODEL: ${KBBOT_LLM_MODEL:-gemini-3-flash-preview}
-      KBBOT_LLM_BASE_URL: ${KBBOT_LLM_BASE_URL:-}
+      KBBOT_LLM_MODEL: ${KBBOT_LLM_MODEL:-Gemma-4-31B-it}
+      KBBOT_LLM_BASE_URL: ${KBBOT_LLM_BASE_URL:-https://api.arliai.com/v1}
+      KBBOT_LLM_TEMPERATURE: ${KBBOT_LLM_TEMPERATURE:-}
       MCP_RAG_URL: http://mcp-rag:3003/mcp
       MCP_WEB_URL: http://mcp-web:3002/mcp
       DATA_DIR: /app/data
@@ -108,9 +110,11 @@ services:
       NETWORK: ${VIKTOR_NETWORK:-testnet2}
       BOT_NAMETAG: ${VIKTOR_NAMETAG:-viktor}
       BOT_MNEMONIC: ${VIKTOR_MNEMONIC:-}
+      VIKTOR_LLM_PROVIDER: ${VIKTOR_LLM_PROVIDER:-openai-compatible}
       VIKTOR_LLM_API_KEY: ${VIKTOR_LLM_API_KEY:-}
       VIKTOR_LLM_MODEL: ${VIKTOR_LLM_MODEL:-gpt-oss}
       VIKTOR_LLM_BASE_URL: ${VIKTOR_LLM_BASE_URL:-}
+      VIKTOR_LLM_TEMPERATURE: ${VIKTOR_LLM_TEMPERATURE:-}
       AGGREGATOR_KEY: ${AGGREGATOR_KEY:-}
       MCP_RAG_URL: http://mcp-rag:3003/mcp
       MCP_WEB_URL: http://mcp-web:3002/mcp

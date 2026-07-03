@@ -1,4 +1,4 @@
-import type { SphereBotConfig } from '@agentic/sphere-bot';
+import { resolveLlmConfig, type SphereBotConfig } from '@agentic/sphere-bot';
 
 const SYSTEM_PROMPT = `You are KBBot, a helpful knowledge base assistant for the Unicity ecosystem. You answer questions about Unicity, AgentSphere, Sphere wallet, agentic commerce, secure AI agents, and related topics.
 
@@ -24,11 +24,6 @@ const SYSTEM_PROMPT = `You are KBBot, a helpful knowledge base assistant for the
 const WELCOME_MESSAGE = "Hi! I'm KBBot, the Unicity knowledge base assistant. Ask me anything about Unicity, Sphere wallet, or agentic commerce!";
 
 export function loadConfig(): SphereBotConfig {
-  const llmApiKey = process.env.KBBOT_LLM_API_KEY;
-  if (!llmApiKey) {
-    throw new Error('KBBOT_LLM_API_KEY environment variable is required');
-  }
-
   return {
     name: 'kbbot',
     network: (process.env.NETWORK || 'testnet2') as SphereBotConfig['network'],
@@ -43,12 +38,12 @@ export function loadConfig(): SphereBotConfig {
     maxSteps: 2,
     maxToolResultChars: 160000,
     maxContextChars: 500000,
-    llm: {
-      provider: 'google',
-      model: process.env.KBBOT_LLM_MODEL || 'gemini-3-flash-preview',
-      apiKey: llmApiKey,
-      baseUrl: process.env.KBBOT_LLM_BASE_URL || undefined,
-    },
+    llm: resolveLlmConfig('KBBOT', {
+      provider: 'openai-compatible',
+      model: 'Gemma-4-31B-it',
+      baseUrl: 'https://api.arliai.com/v1',
+      requireApiKey: true,
+    }),
     mcpServers: [
       { name: 'rag', url: process.env.MCP_RAG_URL || 'http://mcp-rag:3003/mcp' },
       // { name: 'web', url: process.env.MCP_WEB_URL || 'http://mcp-web:3002/mcp' },
