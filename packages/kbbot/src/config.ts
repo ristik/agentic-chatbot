@@ -1,4 +1,4 @@
-import { resolveLlmConfig, type SphereBotConfig } from '@agentic/sphere-bot';
+import { resolveLlmConfig, resolveRateLimit, type SphereBotConfig } from '@agentic/sphere-bot';
 
 const SYSTEM_PROMPT = `You are KBBot, a helpful knowledge base assistant for the Unicity ecosystem. You answer questions about Unicity, AgentSphere, Sphere wallet, agentic commerce, secure AI agents, and related topics.
 
@@ -44,6 +44,12 @@ export function loadConfig(): SphereBotConfig {
       baseUrl: 'https://api.arliai.com/v1',
       requireApiKey: true,
     }),
+    // Senders to silently drop (no reply — avoids feeding bot-to-bot loops).
+    // Operator data, not code: set via KBBOT_BLOCKLIST in the host .env so the
+    // list (and who's on it) stays out of git and needs no rebuild to change.
+    blocklist: (process.env.KBBOT_BLOCKLIST || '').split(',').map(s => s.trim()).filter(Boolean),
+    // Per-sender inbound DM rate limit; tune from the host .env (MAX=0 disables).
+    rateLimit: resolveRateLimit('KBBOT', { maxPerWindow: 30, windowMs: 300_000 }),
     mcpServers: [
       { name: 'rag', url: process.env.MCP_RAG_URL || 'http://mcp-rag:3003/mcp' },
       // { name: 'web', url: process.env.MCP_WEB_URL || 'http://mcp-web:3002/mcp' },
