@@ -195,6 +195,20 @@ export class BotWallet {
         console.error(`${this.tag} reward send failed: ${msg}`);
         return { ok: false, error: msg };
       }
+      // Money-safety (sphere-sdk ≥ 0.11): CERTIFICATION_UNCONFIRMED means the
+      // spend MAY already be certified on-chain — only the inclusion-proof fetch
+      // was inconclusive. The SDK keeps the intent OPEN under the same transferId
+      // and finishes it via resumeOpenIntents() (runs automatically at the next
+      // Sphere.init). Re-issuing send() here would mint a NEW transferId on a
+      // different source and DOUBLE-PAY the recipient. Treat it as "sent, pending
+      // confirmation" (ok:true) so the caller keeps the game in its paid-set and
+      // never re-pays — and never log it as a failure that an operator might retry.
+      if (isSphereError(err) && err.code === 'CERTIFICATION_UNCONFIRMED') {
+        console.warn(
+          `${this.tag} reward to ${recipient} is pending confirmation (may already be on-chain) — NOT re-sending; the open intent completes on resume`,
+        );
+        return { ok: true };
+      }
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`${this.tag} reward send failed: ${msg}`);
       return { ok: false, error: msg };
