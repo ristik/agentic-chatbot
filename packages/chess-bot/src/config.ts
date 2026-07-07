@@ -32,6 +32,15 @@ export interface ChessBotConfig {
    * Bounded so a stuck transfer can't keep the process alive forever.
    */
   shutdownPayoutWaitMs: number;
+  /**
+   * How often (ms) to reconcile OPEN payment intents via
+   * `sphere.payments.resumeOpenIntents()`. A reward whose on-chain
+   * certification was inconclusive (CERTIFICATION_UNCONFIRMED) or whose
+   * mailbox delivery was deferred stays open under its original transferId;
+   * this finishes it (idempotent — never a second spend) without waiting for
+   * the next restart's automatic resume at Sphere.init. Set `0` to disable.
+   */
+  resumeIntervalMs: number;
 }
 
 export function loadConfig(): ChessBotConfig {
@@ -48,5 +57,6 @@ export function loadConfig(): ChessBotConfig {
     coinSymbol: process.env.COIN_SYMBOL || 'UCT',
     shutdownGraceMs: parseInt(process.env.SHUTDOWN_GRACE_MS || '60000', 10),
     shutdownPayoutWaitMs: parseInt(process.env.SHUTDOWN_PAYOUT_WAIT_MS || '60000', 10),
+    resumeIntervalMs: parseInt(process.env.RESUME_INTERVAL_MS || '300000', 10),
   };
 }

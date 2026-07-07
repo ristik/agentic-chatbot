@@ -57,6 +57,10 @@ export class ChessBot {
   private handledGameIdsOrder: string[] = [];
   private handledGameIdsPath: string;
   private paidGameIds = new Set<string>();
+  /** Interval handle for the periodic resumeOpenIntents() reconciliation. */
+  private resumeTimer: ReturnType<typeof setInterval> | null = null;
+  /** Guards against overlapping resumeOpenIntents() ticks. */
+  private resumeInFlight = false;
   private tag: string;
   /**
    * Set true once drain() has begun. New PINGs and CHALLENGEs are
@@ -280,6 +284,22 @@ export class ChessBot {
     this.wallet.ensureBalance().catch((err) =>
       console.error(`${this.tag} Initial balance check failed:`, err),
     );
+
+    // Sphere.init already ran resumeOpenIntents() once. For a long-running
+    // payout bot, also reconcile open intents on a timer so a payment left in
+    // limbo (CERTIFICATION_UNCONFIRMED, or deferred mailbox delivery) is
+    // finished without waiting for the next restart. unref() so the timer alone
+    // never keeps the process alive.
+    if (this.config.resumeIntervalMs > 0) {
+      this.resumeTimer = setInterval(
+        () => void this.resumeOpenIntentsTick(),
+        this.config.resumeIntervalMs,
+      );
+      this.resumeTimer.unref();
+      console.log(
+        `${this.tag} Open-intent reconciliation every ${Math.round(this.config.resumeIntervalMs / 1000)}s`,
+      );
+    }
 
     // Listen for incoming DMs.
     let staleDropCount = 0;
@@ -572,6 +592,34 @@ export class ChessBot {
     );
   }
 
+  /**
+   * Reconcile any OPEN payment intents (sphere-sdk ≥ 0.11). A reward send()
+   * that returned CERTIFICATION_UNCONFIRMED (certified on-chain but the
+   * inclusion-proof fetch was inconclusive) or whose mailbox delivery was
+   * deferred leaves an intent open under its original transferId.
+   * resumeOpenIntents() finishes it — recovering the proof + delivery, or
+   * recording the spend if a rival tx won — and is idempotent, so it never
+   * produces a second spend. Ticks are non-overlapping and skip during
+   * shutdown; failures are logged and retried on the next tick.
+   */
+  private async resumeOpenIntentsTick(): Promise<void> {
+    const sphere = this.sphere;
+    if (this.shuttingDown || this.resumeInFlight || !sphere) return;
+    this.resumeInFlight = true;
+    try {
+      const { resumed, conflicted, failed } = await sphere.payments.resumeOpenIntents();
+      if (resumed.length || conflicted.length || failed.length) {
+        console.log(
+          `${this.tag} resumeOpenIntents: ${resumed.length} resumed, ${conflicted.length} conflicted, ${failed.length} failed`,
+        );
+      }
+    } catch (err) {
+      console.error(`${this.tag} resumeOpenIntents tick failed:`, err);
+    } finally {
+      this.resumeInFlight = false;
+    }
+  }
+
 
   private async postGameResult(info: GameEndInfo, opponentLabel: string, elo: number, botColor: 'w' | 'b'): Promise<void> {
     if (!this.config.groupId || !this.sphere || !info.result) return;
@@ -706,6 +754,10 @@ export class ChessBot {
    */
   async destroy(): Promise<void> {
     console.log(`${this.tag} Tearing down (${this.games.size} active games)...`);
+    if (this.resumeTimer) {
+      clearInterval(this.resumeTimer);
+      this.resumeTimer = null;
+    }
     for (const game of this.games.values()) {
       game.cleanup();
     }
