@@ -15,8 +15,8 @@ importers:
   packages/chess-bot:
     dependencies:
       '@unicitylabs/sphere-sdk':
-        specifier: 0.11.4
-        version: 0.11.4(ws@8.19.0)
+        specifier: 0.11.5
+        version: 0.11.5(ws@8.19.0)
       chess.js:
         specifier: ^1.0.0
         version: 1.4.0
@@ -68,8 +68,8 @@ importers:
         specifier: ^1.27.1
         version: 1.27.1(zod@3.25.76)
       '@unicitylabs/sphere-sdk':
-        specifier: 0.11.4
-        version: 0.11.4(ws@8.19.0)
+        specifier: 0.11.5
+        version: 0.11.5(ws@8.19.0)
       ai:
         specifier: ^6.0.111
         version: 6.0.111(zod@3.25.76)
@@ -93,8 +93,8 @@ importers:
   packages/unicity-l3:
     dependencies:
       '@unicitylabs/sphere-sdk':
-        specifier: 0.11.4
-        version: 0.11.4(ws@8.19.0)
+        specifier: 0.11.5
+        version: 0.11.5(ws@8.19.0)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -399,8 +399,8 @@ packages:
     resolution: {integrity: sha512-l6WcCmFok9nxI1WkYsjIVu67svouA2QyB5Vb+GTNugWrbw7hUgJMA1Elj8qu3u0qojvSINL/L9eWTmXVWRzZUw==}
     engines: {node: '>=18.0.0'}
 
-  '@unicitylabs/sphere-sdk@0.11.4':
-    resolution: {integrity: sha512-MigL1aEaQKY+O14Z+jRDoNsvuHZgZUy+GJQeDKq3r2uGOGB3bN/moEdhNcpxwvQmlaPauJakyGoZXW4zV8yo7Q==}
+  '@unicitylabs/sphere-sdk@0.11.5':
+    resolution: {integrity: sha512-RNh7VW5NcIS7ra6H3gRZCJpNQroURwJWP+QTO9tdSypnO2VDQTMBTnZPCKu7kn4fMKhUdDEsHAT7gpvA9CMXUg==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       ws: '>=8.0.0'
@@ -1183,7 +1183,7 @@ snapshots:
       '@scure/base': 1.2.6
       libphonenumber-js: 1.12.30
 
-  '@unicitylabs/sphere-sdk@0.11.4(ws@8.19.0)':
+  '@unicitylabs/sphere-sdk@0.11.5(ws@8.19.0)':
     dependencies:
       '@noble/ciphers': 2.2.0
       '@noble/curves': 2.2.0
