@@ -1,6 +1,6 @@
 # Sphere Wallet User Manual
 
-Sphere is the official wallet and application for the Unicity ecosystem. It lets you create and manage a Unicity wallet, send and receive tokens on both the L1 (ALPHA blockchain) and L3 (Unicity state transition network), chat with other users via encrypted direct messages and group chats, interact with AI-powered marketplace agents, and connect to external dApps.
+Sphere is the official wallet and application for the Unicity ecosystem. It lets you create and manage a Unicity wallet, send and receive tokens on the L3 (Unicity state transition network), chat with other users via encrypted direct messages and group chats, interact with AI-powered marketplace agents, and connect to external dApps.
 
 ## Getting Started
 
@@ -41,13 +41,13 @@ If you haven't registered a Unicity ID yet, a **Register ID** button appears in 
 
 Below your balance are three action buttons:
 - **Top Up** — Get tokens from the testnet faucet or create a payment request.
-- **Swap** — Exchange one token type for another (e.g., UCT to USDU).
+- **Swap** — Exchange one token type for another.
 - **Send** — Send L3 tokens to another user.
 
 ### Assets and Tokens Tabs
 
 Two tabs let you view your holdings in different ways:
-- **Assets** — Groups your tokens by coin type (e.g., all UCT tokens combined). Shows the total amount, USD value, and 24-hour price change for each asset. Your L1 ALPHA balance also appears here when you have one.
+- **Assets** — Groups your tokens by coin type. Shows the total amount, USD value, and 24-hour price change for each asset.
 - **Tokens** — Shows individual token units, sorted by newest first.
 
 ## Sending Tokens (L3)
@@ -97,8 +97,6 @@ When someone sends you a payment request:
 4. The exchange rate is displayed live.
 5. Click **Swap Tokens** to execute the trade.
 
-Supported coins for swapping include UCT, USDU, BTC, ETH, SOL, USDT, and USDC.
-
 ## Top Up (Testnet Faucet)
 
 On testnet, you can get free tokens:
@@ -107,39 +105,6 @@ On testnet, you can get free tokens:
 3. You'll receive a set of test tokens in various denominations.
 
 Note: You must have a registered Unicity ID to use the faucet.
-
-## L1 Wallet (ALPHA Blockchain)
-
-Sphere includes a built-in L1 wallet for the ALPHA blockchain. Access it from **Settings > L1 Wallet** or by clicking the L1 ALPHA asset row in your assets list.
-
-### Viewing Your L1 Balance
-
-The L1 wallet shows your total ALPHA balance, broken down into:
-- **Vested** — ALPHA that is fully available to spend.
-- **Unvested** — ALPHA from coinbase rewards that is still in the vesting period.
-
-### Sending ALPHA (L1)
-
-1. In the L1 wallet, click **Send ALPHA**.
-2. Enter the destination address (`alpha1...` format) or a Unicity ID.
-3. Enter the amount and review the fee estimate.
-4. Confirm and send.
-
-### Receiving ALPHA (L1)
-
-Click the **Receive** button in the L1 wallet to display a **QR code** of your L1 address. Share this QR code or your `alpha1...` address with the sender.
-
-### L1 Transaction History
-
-Click the **Transaction History** button in the L1 wallet to see your L1 transactions. Each entry shows:
-- Whether it was sent or received.
-- The amount in ALPHA.
-- A clickable transaction ID that opens in the Unicity block explorer.
-- Confirmation count.
-
-### Multiple L1 Addresses
-
-You can derive additional L1 addresses from the address dropdown in the L1 wallet. Each address is linked to the same HD wallet and shares the same recovery phrase.
 
 ## Direct Messages (DM Chat)
 
@@ -207,21 +172,16 @@ When enabled, your token data is automatically synced to IPFS after changes. Whe
 
 Access settings by clicking the **three-dot menu** icon in the wallet header.
 
-### L1 Wallet
-
-Opens the full L1 (ALPHA blockchain) wallet interface (described above).
-
 ### My Public Keys
 
 Displays all your identity keys and addresses:
 - **Unicity ID** (`@nametag`)
 - **Direct Address** (`DIRECT://...`) — your L3 address for receiving tokens
 - **Proxy Address** — alternative L3 address format
-- **L1 Address** (`alpha1...`) — your ALPHA blockchain address
 - **Chain Pubkey** — 33-byte compressed secp256k1 public key
 - **Transport Pubkey** — Nostr transport key for messaging
 
-Each field has a copy button. There is also a **Lookup** feature where you can search for any user by their Unicity ID, direct address, or L1 address to see all their associated addresses.
+Each field has a copy button. There is also a **Lookup** feature where you can search for any user by their Unicity ID or direct address to see all their associated addresses.
 
 ### Backup Wallet
 
@@ -263,15 +223,10 @@ Approved connections are remembered per website so you won't be prompted again f
 ## Glossary
 
 - **Unicity ID / Nametag**: A human-readable username (e.g., `@alice`) registered on-chain. Used for receiving payments and messages.
-- **L1 (Layer 1)**: The ALPHA blockchain — a UTXO-based proof-of-work blockchain.
 - **L3 (Layer 3)**: The Unicity state transition network — a token transfer layer with state proofs.
-- **ALPHA**: The native cryptocurrency of the Unicity L1 blockchain.
-- **UCT (Unicity Token)**: A token on the Unicity L3 network.
-- **USDU (Unicity-USD)**: A USD-pegged stablecoin on the Unicity L3 network.
 - **Direct Address**: An L3 address in `DIRECT://...` format used for receiving L3 tokens.
 - **Recovery Phrase / Seed Phrase**: A 12-word mnemonic that can restore your entire wallet. Keep it secret and safe.
 - **HD Wallet**: Hierarchical Deterministic wallet — a single recovery phrase can derive multiple addresses.
-- **Vesting**: A period during which mined ALPHA tokens are locked and gradually become spendable.
 - **IPFS**: InterPlanetary File System — a decentralized storage network used for token data backup.
 - **Nostr**: A decentralized messaging protocol used for encrypted DMs and token transfers in Sphere.
 - **NIP-29**: A Nostr protocol extension for relay-based group chat.

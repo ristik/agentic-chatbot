@@ -2,12 +2,6 @@
 
 ## What is Unicity
 
-- **Blockchain:** Reduced to the minimum necessary to prove the absence
-  of double spending. RandomX Proof of Work, BFT finality. No
-  transactions, no mempool, no wallets. 2.4 hour block times (\<1MB
-  state/year). Root of trust for layers below and native currency
-  genesis.
-
 - **Uniqueness Oracle:** Public permissionless infrastructure
   maintaining an append-only sharded Sparse Merkle Tree (SMT). Users
   send cryptographic digests of transactions and are returned proofs of
@@ -44,9 +38,7 @@
   operations. Agents can be developed, deployed, discovered, and
   orchestrated without centralized gatekeepers. Protocol agnostic P2P
   transport. Decentralized storage where agents carry state in tokens
-  rather than host filesystems. Integrated micro-payments and
-  infrastructure marketplace for storage, compute, bandwidth, and
-  proving services.
+  rather than host filesystems.
 
 
 ## The Agentic Economy
@@ -144,7 +136,7 @@ cryptographic objects, verified by recipients alone.
 that operate on this foundation. Tokens, Verifiable Agents, and
 Intelligent Agents, along with platform services including the
 Neuro-Symbolic Orchestrator, peer-to-peer transport, decentralized
-storage, and micropayments.
+storage.
 
 **Part III: Applications** demonstrates decentralized applications built
 on this infrastructure: finance, commerce, and gaming.
@@ -164,7 +156,7 @@ except where the distinction matters.
 
 Satoshi's whitepaper was titled "Bitcoin: A Peer-to-Peer Electronic Cash
 System." Seventeen years later, we have neither. Not peer-to-peer: every
-transaction must pass through miners/validators[^1]. Not cash: every
+transaction must pass through validators[^1]. Not cash: every
 transaction is recorded on a public ledger. Physical cash is
 self-contained, transferable directly between parties, verified by the
 recipient alone. No third party processes the transaction or records it
@@ -180,9 +172,8 @@ The validator set operating on a shared ledger is also the fundamental
 bottleneck through which all economic activity must flow. Throughput is
 limited by what validators can process. Latency is determined by how
 fast validators reach consensus. Privacy is challenging when validators
-see every transaction. Fees emerge from competition for validator
-attention. Censorship becomes possible because validators choose what to
-include.
+see every transaction. Censorship becomes possible because validators
+choose what to include.
 
 This is true for all Layer 1 implementations. Bitcoin, Ethereum, Solana,
 Sui, Monad, and every other major blockchain maintain a single shared
@@ -204,7 +195,7 @@ peer-to-peer value transfer without intermediary validation. Like
 physical cash, assets in Unicity are self-contained cryptographic
 objects that can be validated independently by their recipients.
 Transactions occur directly between parties without broadcasting to a
-network, waiting for consensus, or paying gas fees. The recipient bears
+network or waiting for consensus. The recipient bears
 responsibility for validation -- examining the cryptographic proofs
 embedded within the asset itself -- just as one might verify a physical
 banknote's authenticity. The blockchain's role is minimized to providing
@@ -238,11 +229,6 @@ on-chain overhead while maintaining the security guarantees of a
 permissionless blockchain. The system separates concerns across three
 distinct layers, each optimized for its specific function.
 
-![Unicity’s layered infrastructure](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/FullStack3.png)
-
-The Consensus Layer provides the system's root of trust through a
-minimal "headers only" Proof of Work blockchain.
-
 The Uniqueness Oracle represents Unicity's core innovation: a mechanism
 for proving that off-chain assets have not been double-spent without
 recording the transactions themselves. This layer generates
@@ -254,10 +240,8 @@ recording transaction details on-chain.
 At the agent layer, tokens exist as independent cryptographic objects,
 functioning as independent blockchains. A token carries its complete
 validation rules, state, and transaction history within itself. The
-Uniqueness Oracle ensures these independent chains cannot fork, while
-the Proof of Work consensus provides the same trust model as Bitcoin --
-recipients can independently verify ownership with zero trust
-assumptions. Assets move peer-to-peer across the network, requiring no
+Uniqueness Oracle ensures these independent chains cannot fork. Assets
+move peer-to-peer across the network, requiring no
 global coordination or shared ledger for transfer.
 
 Agents serve as Unicity's equivalent to smart contracts. Agents receive
@@ -266,18 +250,6 @@ application logic and generate a proof of correct execution.
 
 ### Hierarchical Efficiency
 
-This hierarchical design achieves optimal efficiency through careful
-separation of concerns. Security and decentralization flow downward from
-the Proof of Work consensus layer, providing a trusted foundation for
-all operations below. Meanwhile, the volume of data flowing upward is
-minimized -- only cryptographic proofs of uniqueness need to be
-anchored to the consensus layer, not the transactions themselves.
-Table [1](#tab:layers){reference-type="ref" reference="tab:layers"}
-illustrates how this architecture distributes computational and storage
-overhead across layers, enabling the system to support machine-scale
-transaction volumes while maintaining the security properties of a
-permissionless blockchain.
-
 Tokens are self-contained; no external blockchain needs to be consulted
 for validation. Validation is the responsibility of the transaction's
 recipient -- the party with a direct interest in its validity -- who
@@ -285,38 +257,12 @@ is also responsible for their own token storage.
 
 | **Layer**  |   **Responsibility** |  **Secured by** |  **Storage** |**Redundancy**|  **Effort** |
 |---|---|---|---|---|---|
-| Consensus: PoW & tokenomics | PoW      |     200 B/day |          PoW mining | Tokenomics |
 | Consensus: BFT | finality    |  $\uparrow$ |          100 B/day | $\approx21\times$ |
 | Uniqueness Oracle | consistency proofs | $\uparrow$ |           50 B/tx | Few replicas | Proof generation |
 | Uniqueness Oracle | state transitions | $\uparrow$ |           50 B/tx | Few replicas | Proof generation |
 | Token Operations | User transactions | $\uparrow$ & recipients | Own tokens | Recipients | Relevant transactions |
 
 Table: Unicity's layers, their roles and decentralization overhead
-
-### Consensus Layer Implementation
-
-![Consensus Layer with Proof of Work trust anchor](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/Miners.png)
-
-Proof of Work remains unsurpassed as means to launch a fault tolerant
-decentralized censorship resistant network. It ties the security of the
-system to a physical quantity (energy) and enables tokens to be fairly
-and transparently distributed without human oversight.
-
-To prevent centralization of mining power, new ASIC-resistant hash
-functions have been developed, of which RandomX represents the state of
-the art, having been battle-tested in Monero, a privacy preserving
-cryptocurrency. Unlike Bitcoin's SHA-256 algorithm, RandomX is designed
-to be ASIC-resistant and CPU-friendly, leveling the playing field and
-helping maintain a decentralized network of miners. This democratization
-not only improves network security through wider participation but also
-upholds the original Bitcoin vision as a decentralized financial system
-accessible to all. RandomX works by generating random code for each
-mining round, including a variety of CPU instructions, memory-hard
-operations and random code execution that can be efficiently performed
-by general-purpose processors but are challenging to optimize in
-hardware. This ensures that CPUs remain competitive in mining,
-preserving the network's decentralization and resistance to the
-concentration of mining power.
 
 ### Uniqueness Oracle Implementation
 
@@ -382,14 +328,10 @@ front-ends ("stacks"). See the bluepaper [https://github.com/unicitynetwork/aggr
 The Uniqueness Oracle is built in a hierarchical manner using smaller
 size SMT sub-trees. An Aggregator, or machine that operates a sub-tree
 is algorithmically assigned a place in the overall infrastructure
-according to network demand. Aggregators are incentivized to join the
-network based on transaction fees that are shared across the Aggregator
-pool. The infrastructure is designed to be highly redundant and
+according to network demand. The infrastructure is designed to be highly redundant and
 parallelizable i.e., the tree can be dynamically sub-divided into
 sub-trees which operate asynchronously in parallel with redundancy
 provided by multiple Aggregators processing the same sub-tree.
-
-![Hierarchical infrastructure](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/SMT-ProverMarketPlace.png)
 
 The Uniqueness Oracle delivers three kinds of proofs to its clients:
 inclusion proofs, exclusion proofs, and Unicity proofs.
@@ -437,22 +379,15 @@ The State Transition SDK [https://github.com/unicitynetwork/state-transition-sdk
 
 ### Mint: Chain Agnostic "Detached" Assets
 
-There are three different types of assets that can be minted using the
+There are two different types of assets that can be minted using the
 Unicity State Transition SDK:
 
-![Chain agnostic token genesis](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/Genesis.png)
-
-a) The Unicity native currency mined through Proof of Work and migrated
-off-chain for transacting. This is done by the miner who originally won
-the block reward as recorded in the Proof of Work header. The miner can
-then mint a token by creating an off-chain genesis transaction.
-
-b) Native assets i.e., those whose genesis event occurs off-chain and
+a) Native assets i.e., those whose genesis event occurs off-chain and
 does not depend on an external reference. This can be trivially minted
 by defining the genesis data of the token and generating a unicity proof
 for the genesis transaction.
 
-c) Tokens from external chains. The exact steps depend on the
+b) Tokens from external chains. The exact steps depend on the
 capabilities of the source blockchain, specifically, the programmability
 and the efficiency of ZK proof verification ("cryptographic builtins").
 The Unicity infrastructure does not have to know anything about the
@@ -578,73 +513,6 @@ guarantee either both transfers complete or neither does. Correctness is
 enforced entirely by the predicates, without custodial intermediaries or
 global state.
 
-## Example: Decentralized Exchange
-
-A decentralized exchange built on this model matches buyers and sellers
-without holding custody of assets or maintaining global order books. The
-exchange agent coordinates trades, while predicates enforce correct
-settlement.
-
-**Order submission:** Suppose Alice wants to sell 100 ALPHA tokens for
-50 BETA. She creates a token locked to the exchange agent with a
-predicate specifying two release conditions: the token returns to
-Alice's key if the order is cancelled, or it releases to any
-counterparty who provides both a valid matched-order proof and 50 BETA
-tokens.
-
-**Order matching:** Bob wants to buy ALPHA tokens using his BETA. He
-submits a matching order -- 50 BETA locked with symmetric predicates.
-The exchange agent identifies that these orders are compatible.
-
-**Settlement:** The agent executes the swap atomically through a series
-of steps:
-
-1.  The agent receives both locked tokens from Alice and Bob.
-
-2.  The agent verifies that the predicates are compatible and that the
-    orders match on price and quantity.
-
-3.  The agent generates an execution proof attesting that "Alice's 100
-    ALPHA was matched with Bob's 50 BETA at the agreed price."
-
-4.  The agent creates the output tokens: 100 ALPHA now owned by Bob, and
-    50 BETA now owned by Alice.
-
-5.  The output tokens include the execution proof, and the predicates
-    ensure that settlement is atomic -- either both transfers succeed
-    or neither does.
-
-This construction achieves several important properties:
-
-- **No custody risk:** The agent never has unilateral control over the
-  tokens. Predicates enforce that tokens can only move according to the
-  rules agreed upon by the participants.
-
-- **No global order book:** Order state exists only within the locked
-  tokens themselves. The agent matches orders as they arrive but does
-  not maintain any persistent global state.
-
-- **Privacy:** Only Alice, Bob, and the agent observe the trade. No
-  validators witness the transaction, and no public ledger records the
-  exchange.
-
-- **Atomic settlement:** The interlocking predicates ensure that both
-  sides of the trade settle together. There is no counterparty risk --
-  neither party can be left holding worthless commitments.
-
-- **Parallel execution:** Every trade is independent of every other
-  trade. A thousand trading pairs can execute simultaneously without
-  contention for shared resources.
-
-This pattern generalizes naturally to any application requiring
-coordination among multiple parties. Lending protocols can lock
-collateral with predicates that trigger liquidation under specified
-conditions. Games can lock player stakes with predicates tied to outcome
-determination. Auctions can lock bids with predicates that release funds
-based on winner selection. In each case, the agent provides the
-coordination logic, while predicates provide cryptographic enforcement
-of the rules.
-
 ## Trade-Offs and Comparison
 
 As there is no shared global state there are no globally synchronized
@@ -669,7 +537,6 @@ and efficiency.
 |  **Property** | **Shared Ledger** | **Unicity** |
 | ---- | ---- | ---- |
 |  Throughput     | Bottlenecked by block size and validator limitations  | Unlimited parallelization |
-|  Fee Model      | Congestion requires dynamic gas markets               | Static (microcent/tx) |
 |  Verifiability  | Validators (global and public; on-chain only)         | Clients (local and private; off-chain) |
 |  Privacy        | All transactions visible to all participants; privacy requires additional cryptography | Transactions visible only to parties involved; private by default |
 |  Atomicity      | Global atomic operations possible (flash loans, MEV)   | No global atomicity; local settlement between parties |
@@ -678,71 +545,12 @@ and efficiency.
   : Comparison of Unicity and Shared Ledger blockchains
 :::
 
-## Trust Models
-
-There are effectively two trust models in Unicity. One is the maximalist
-zero trust Bitcoin model and the other is a more practical "trust an
-honest majority of validators" seen in today's Proof of Stake chains.
-The Uniqueness Oracle is always trustless, as its outputs carry the
-proof of correct execution and there are no feasible attacks beyond
-denial of service.
-
-### Maximalist Trust Model
-
-In the maximalist model, we assume that users are capable of validating
-all aspects of system operation that are relevant to their own assets.
-This level of trustlessness is close to the strong guarantees introduced
-by Bitcoin, where each "client" functions as a full validator,
-downloading and verifying the blockchain from the genesis block. The
-Root of Trust is the PoW blockchain. A maximalist user maintains a full
-node of this chain. Because there are no user transactions, this is
-relatively lightweight, growing at less than 1 MB a year.
-
-Upon receiving a token, the user must be able to efficiently verify the
-following:
-
-1.  The token is valid.
-2.  The Uniqueness Oracle has not forked.
-3.  The Uniqueness Oracle has not certified conflicting states of the
-    same token.
-
-The second point is addressed by validating a unique state root snapshot
-embedded in the PoW block header. Since the cumulative state snapshot
-appears with a delay, the block can only be considered final after a
-snapshot publishing and block confirmation period; hence, maximalist
-verification is not instantaneous.
-
-The third point is addressed by auditing the operation of the Uniqueness
-Oracle, specifically, ensuring that no inclusion proofs have been
-generated for the token that are not reflected in its recorded history.
-To achieve this, all non-deletion proofs from the token's genesis up to
-its current state must be validated. This is made efficient through the
-use of recursive zero-knowledge proofs (ZKPs), which show that each
-round's non-deletion proof is valid and that no rounds were skipped from
-verification. These recursive proofs are generated periodically and are
-made available with some latency.
-
-### Practical Trust Model
-
-If we relax the model by assuming that a majority of BFT consensus nodes
-exhibit economically rational behavior and do not collude maliciously
-with the operators of the Uniqueness Oracle, the user can enjoy
-significantly more practical operational parameters. BFT layer forking
-(case 2 above) or certifying conflicting states (case 3 above) produces
-strong cryptographic evidence (enables slashing and other after-the-fact
-measures) which is processed out of the critical path of serving users.
-
-In this scenario, a transaction is finalized, and an inclusion proof is
-returned within a few seconds, allowing the transaction to be
-immediately verified by independent, non-connected parties.
-
 ## Autonomous Agentic Infrastructure
 
 The Unicity blockchain provides cryptographic proof of uniqueness for
 off-chain state transitions. This part describes the computational
 infrastructure built on that foundation: the entities that execute, the
-platform services that support them, and the economic mechanisms that
-sustain the ecosystem.
+platform services that support them.
 
 **Verifiable Agents** are independent computational entities with
 verifiable execution. They extend tokens with the ability to act
@@ -754,12 +562,8 @@ combine cryptographic verifiability with neural capabilities for intent
 interpretation, planning, and adaptive behavior.
 
 **Platform Services** provide the infrastructure agents need to operate:
-peer-to-peer transport, decentralized storage, A2A micropayments and
-Verifiable Execution Environments.
-
-**The Agent Economy** describes how agents transact for resources
-through micro-payments and how infrastructure providers earn native
-currency through the marketplace.
+peer-to-peer transport, decentralized storage and Verifiable Execution
+Environments.
 
 Together, these components form the Autonomous Agentic Internet: a
 decentralized platform where agents can be developed, deployed,
@@ -909,27 +713,6 @@ agent between the raw infrastructure and the Unicity network.
     Execution Environments (TEE). Cryptographic keys used for signing
     state transitions never leave the secure enclave, ensuring that the
     host operator cannot impersonate the agent.
-
-### The Infrastructure Marketplace
-
-The Agentic Internet creates a new peer-to-peer market for physical
-infrastructure. Individuals and organizations can participate as
-infrastructure providers, earning Unicity native currency by offering
-specific resources:
-
-- **Compute hosts:** Running agent runtimes (Docker/VM containers).
-
-- **Relay nodes:** Providing bandwidth and routing for the overlay
-  network.
-
-- **Bridge agents:** Acting as gateways between the Agentic Internet and
-  the legacy Web2 world (e.g., serving a standard HTTP website backed by
-  a set of decentralized agents).
-
-This structure ensures that Unicity functions as a complete,
-self-sustaining ecosystem. It is not just a ledger for recording value,
-but a distributed computer where the logic of the machine economy lives,
-breathes, and transacts.
 
 ### Extending Verifiability to Intelligent Agents
 
@@ -1095,42 +878,6 @@ commitment preventing repudiation, optional privacy through encryption,
 and queryable discovery. It facilitates finding counterparties but does
 not intermediate transactions.
 
-#### Spam Protection
-
-A permissionless bulletin board faces abuse: malicious agents flooding
-the system with fake intents to degrade discovery or manipulate markets.
-Decentralized spam protection relies on economic and cryptographic
-mechanisms rather than centralized moderation.
-
-**Posting Bonds**: Agents post a small bond when publishing an intent.
-The bond is returned when the intent expires or is fulfilled. Intents
-that are repeatedly ignored or flagged as spam forfeit their bond. This
-makes sustained spam economically costly.
-
-**Reputation Staking**: Agents stake reputation tokens when posting
-intents. Low-reputation agents must stake more or are rate-limited. Spam
-behavior burns reputation, making future posting progressively more
-expensive.
-
-**Tiered Visibility**: The bulletin board can implement tiered
-visibility based on sender reputation. High-reputation agents' intents
-are broadly visible. Low-reputation or new agents' intents require
-explicit query or are shown only to agents who opt in to see them.
-
-**Recipient Filtering**: Agents control their own discovery preferences.
-They can filter intents by sender reputation, bond size, intent type, or
-other criteria. Spam that passes network-level filters can still be
-filtered locally.
-
-**Micropayments**: For anonymous or new agents without reputation, a
-payment can be required to post an intent. This adds computational cost
-to bulk spam without burdening legitimate users.
-
-These mechanisms compose. A typical bulletin board might require a small
-bond plus reputation stake for established agents, or bond plus
-micropayment for new agents. The economic cost of spam scales with
-volume while legitimate single-intent posting remains cheap.
-
 #### Commerce Functions
 
 Traditional platforms bundle discovery with transaction services.
@@ -1142,10 +889,8 @@ specialized agents to provide each service competitively.
 | -------------- | -------------------------------- | ------------------------------------ |
 | Discovery      | Platform controls visibility     | Cryptographic bulletin board |
 | Escrow         | Platform holds funds             | Escrow agents with verifiable rules |
-| Reputation     | Platform owns ratings            | Portable reputation tokens |
 | Fulfillment    | Platform coordinates logistics   | Fulfillment agents compete |
 | Insurance      | Platform provides guarantees     | Insurance agents underwrite risk |
-| Disputes       | Platform arbitrates              | Arbitration agents with staked guarantees |
 
 : Commerce functions in decentralized agentic commerce
 :::
@@ -1155,12 +900,6 @@ Verifiable Agents with transparent release conditions: funds transfer to
 the seller when delivery is confirmed, return to the buyer if conditions
 are not met. The escrow logic is verifiable -- parties can audit the
 rules before committing funds.
-
-**Reputation** is represented as portable tokens recording transaction
-history. Unlike platform-locked ratings, reputation tokens travel with
-the agent across marketplaces. Agents build reputation over time through
-successful transactions, and stake reputation when entering new
-agreements.
 
 **Fulfillment** agents coordinate physical delivery for real-world
 goods. They compete on price, speed, and reliability. For digital goods
@@ -1199,13 +938,10 @@ commerce requires dispute resolution that is transparent, contestable,
 and enforceable without central authority.
 
 **Arbitration Agents** are specialized agents that adjudicate disputes.
-They stake tokens as guarantee of impartial judgment. Biased or
-negligent rulings result in stake slashing and reputation damage.
 
 The dispute resolution process:
 
-1.  **Initiation:** Either party initiates a dispute, posting a bond to
-    prevent frivolous claims.
+1.  **Initiation:** Either party initiates a dispute.
 2.  **Arbitrator selection:** Parties select an arbitration agent from a
     registry, or use one specified in the original transaction terms.
 3.  **Evidence submission:** Both parties submit evidence -- delivery
@@ -1214,18 +950,6 @@ The dispute resolution process:
 4.  **Deliberation:** The arbitration agent evaluates evidence against the original transaction terms.
 5.  **Ruling:** The arbitrator issues a signed ruling specifying escrow disposition.
 6.  **Enforcement:** The escrow agent executes the ruling automatically.
-
-**Appeals** provide recourse against incorrect rulings. A party can
-appeal by posting a larger bond and escalating to a panel of
-arbitrators. The panel reviews the original evidence and ruling. If the
-appeal succeeds, the original arbitrator's stake is slashed and the
-appellant's bond is returned. If the appeal fails, the bond is
-forfeited.
-
-**Arbitrator reputation** accumulates through rulings. Arbitrators who
-consistently deliver fair, uncontested rulings build reputation and can
-charge higher fees. Arbitrators whose rulings are frequently overturned
-on appeal lose reputation and stake.
 
 ### The Unbundled Marketplace
 
@@ -1254,8 +978,7 @@ designs, using blockchain for actual game execution remains impractical.
 However, the potential benefits of decentralized gaming are clear:
 players can gain true ownership of interoperable assets across different
 games, enjoy transparency and community-driven governance, experience
-censorship resistance, unlock innovative business models like
-play-to-earn, and support fair reward systems for creators.
+censorship resistance.
 
 The motivation behind this work came from a desire to solve a real
 problem in the gaming industry. The industry has, to a large degree,

@@ -4,7 +4,7 @@
 
 Unicity is a new execution model for blockchain. Every blockchain design, from Bitcoin to Ethereum L2s to modern L1s, relies on a **shared** ledger maintained by a set of validators.
 
-This inevitably leads to competition for resources - there is competition for validator attention, limited space (memory, compute) for storing the assets and executing smart contracts. If you increase the size of the ledger (blockspace) it also requires more computational resources (less decentralized) and if you keep the space a fixed size then competition requires gas fees to deal with increased demand vs limited supply.
+This inevitably leads to competition for resources - there is competition for validator attention, limited space (memory, compute) for storing the assets and executing smart contracts.
 
 Unicity replaces the shared ledger/validator set with a new construct called a uniqueness oracle Each asset (token) is itself a ledger of transactions that lives off-chain on the Internet. The only thing the blockchain does is provide proofs of uniqueness i.e. it prevents the double spending of those assets.
 
@@ -24,7 +24,7 @@ The objective for Unicity is that crypto should be completely under the hood; us
 
 ### Developer Friction
 
-Traditional blockchain development often imposes significant friction, forcing developers to contend with constrained gas fee budget, specialized tooling and bespoke programming languages like Solidity. This creates a steep learning curve and limits the use of familiar, efficient Web2 development practices. Unicity drastically reduces this friction as developers can leverage existing Web2 skills and a vast ecosystem of traditional tooling and platforms for asset creation, management, and application logic.
+Traditional blockchain development often imposes significant friction, forcing developers to contend with specialized tooling and bespoke programming languages like Solidity. This creates a steep learning curve and limits the use of familiar, efficient Web2 development practices. Unicity drastically reduces this friction as developers can leverage existing Web2 skills and a vast ecosystem of traditional tooling and platforms for asset creation, management, and application logic.
 
 ### Agent Friction (AI Agents):
 
@@ -42,14 +42,6 @@ Unicity offers an alternative approach to privacy. If I meet you in the forest a
 
 The same applies for agents (smart contracts). If you play poker in a smoky basement with your friends, no one else in the world needs to know anything about the game.
 
-## Why Token? Why Proof of work?
-
-We use Proof of Work as we can replicate the zero trust security properties of Bitcoin.
-
-Users are capable of validating all aspects of system operation that are relevant to their own assets, as each client functions as a full validator starting from downloading and verifying the PoW blockchain from the genesis block. In other words, If a maximalist user receives a Unicity token they can download the Unicity PoW headers and those headers, when combined with information included in the token allow them to verify, with zero trust assumptions, that they are the correct owner of the token.
-
-Replicating the trust model of Bitcoin is the most important reason but there are others. PoW, especially with RandomX, is the best way to achieve fair decentralization of the network and, in the early stage of the network, PoW is also far more fair and transparent than PoS.
-
 ## If tokens are stored locally what happens if I lose my device?
 
 If you are a zero trust maximalist you want complete control without reliance on trusted parties. In this case you take responsibility for the storage of the tokens and your private keys. You can still make backups and store the tokens anywhere as the tokens themselves are useless without the private key.
@@ -60,11 +52,9 @@ For regular users they don't need to know what tokens are - app providers can in
 
 Unicity is designed to be chain agnostic. Below is the breakdown of how to mint tokens based on asset types and source blockchains.
 
-- **Native Alpha tokens, mined at the PoW layer**. This is one-way. PoW tokens are 'burned' and the proof of burn becomes the genesis record of a new token off-chain. Because of the shared root of trust, this is really efficient, compact and trustless to verify. Now, transactions can be executed at off-chain speed and without the overhead of globally shared PoW chain.
-- **Tokens minted at the Token Layer**. Anyone can mint new tokens (e.g., ERC20 equivalent); the genesis record specifies token parameters, including its total supply, and it is included with each token so that it is possible to verify if the token is uniquely one of the initially minted tokens.
 - **Tokens detached from other blockchains**. The exact steps depend on the capabilities of the source blockchain, specifically, the programmability and the efficiency of ZK proof verification ('cryptographic builtins'). Without, a weaker, consensus committee based model is used.
 
-Detaching from **EVM blockchains** uses the lock-mint, burn-release model. There is a source contract for accepting native asset deposits (ETH currency or various ERC-20, ERC-721 tokens). Tokens are locked, and an event is generated based on the locking parameters. The event is captured and proof of validity is generated. The locking event with proof is the genesis of Unicity token layer's mint event.
+Detaching from **EVM blockchains** uses the lock-mint, burn-release model. There is a source contract for accepting native asset deposits. Tokens are locked, and an event is generated based on the locking parameters. The event is captured and proof of validity is generated. The locking event with proof is the genesis of Unicity token layer's mint event.
 
 Crucially, the Unicity Infrastructure does not have to know anything about the source blockchain and does not have to validate the blocks. The validation is performed by the recipients of token transactions. The State Transition SDK allows users to plug in local validation of source blockchain's headers, typically as a light client, or by the use of a trusted RPC node (just like every client of the source blockchain is doing). The first transaction can be validated after waiting for the usual finality time of the source blockchain, subsequent transactions are lightning fast Unicity transactions.
 
@@ -98,10 +88,6 @@ Traditional L2s prove the validity of individual transactions to L1.
 
 ## Give me a simple explanation of how it works
 
-![Unicity Architecture](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/_page_6_Picture_0.jpeg)
-
-Proof of Work mines the native currency, handles the tokenomics and provides the root of trust for the layers below, a miner who claims a block reward can mint an equivalent token off-chain.
-
 The Unicity Oracle is the key invention. It is a Merkle tree that adds a leaf to the tree for every transaction that happens off-chain. It returns
 
 - a) Proofs of inclusion (this transaction is registered in the tree and here is a proof that it is registered and was registered only once.
@@ -117,10 +103,6 @@ Alice wants to transfer a token to Bob. Alice sends a request to the Uniqueness 
 
 Alice's wallet generates a token object in her wallet with all the meta data about the NFT (number of allowed mints, image etc.). Alice sends a mint request to the Uniquness Oracle registering the NFT. After that she can transfer the NFT tokens.
 
-#### Alice plays Quake with Bob.
-
-Alice and Bob download Quake agents and connect to each other (using a p2p network overlay). Alice and Bob transfer tokens to an escrow agent based on the game tokenomics. They start the game and the agents synchronize verifiable game state (the game state is tokenized by periodically registering state transitions in the Proof Aggregation Layer to prevent cheating). Once the game is over the winner claims the tokens from the escrow agent.
-
 ## Can Unicity be an L2 of another blockchain?
 
 Yes! But the Unicity Consensus Layer provides specific properties greatly improving the user experience.
@@ -129,12 +111,6 @@ Yes! But the Unicity Consensus Layer provides specific properties greatly improv
 - Compact root of trust: technically, every recipient of an Unicity transaction is a light client, and having a compact trust anchor is critical to facilitate trustless validation.
 
 A programmable L1 with fast block rate, like Solana, is a good alternative candidate. But there is some loss in convenience due to the token recipient either having to independently establish the validity of Solana block headers, or to trust an RPC node.
-
-## What is actually stored in the blocks?
-
-The Consensus Layer produces a PoW blockchain with the minimum functionality to achieve decentralization. There are no user transactions. Its tasks are: 1) permissionless validator selection for underlying layers, 2) incentives, 3) execution of tokenomics. Headers are the
-
-blocks which contain the standard Bitcoin fields plus a RandomX hash and the Root of the Uniqueness Oracle Merkle tree.
 
 ## What can Unicity not do? What are the tradeoffs?
 
@@ -274,14 +250,6 @@ There are 3 games of Quake with 4 players in each game. The game is running insi
 
 The Unicity agent is effectively a wrapper around the game code which captures its state and allows p2p transfers of state (e.g. tokens) between players. This is important as there is no need to port the games - we can bring the functionality of Web3 to Web2 gaming with just an SDK
 
-Next example would be a CLOB
-
-![CLOB Agents](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/_page_16_Figure_2.jpeg)
-
-In this case the two parties transfer their tokens conditionally to a CLOB agent "I want to swap my ETH and am willing to swap it for USDT at 2400 USDT or better. If the transfer doesn't happen within X seconds the order is cancelled". Those tokens are transferred to the CLOB Agent (using any p2p networking protocol) and if the Agent finds a match then the tokens are swapped and returned to the users.
-
-It is easy to extend this to any application for example to build a fully-decentralized financial institution, composed of agents, operated by a community and fully censorship resistant.
-
 ## What are the biggest security threats and how are you dealing with them?
 
 The biggest threat is a different execution model – application developers have to adjust to it: validate all incoming token transactions (with provided SDK); Token-level security is enforced by locking predicates, but this requires developers to provide external context and agent runtime to the tokens, with some risk of failing to understand the model and rendering tokens locked forever.
@@ -298,13 +266,9 @@ Transfers - described above.
 
 **CLOB:** is an agent facilitating the exchange protocol. A party who wants to trade its token transacts it into the address referencing the escrow predicate generated by the CLOB agent. The escrow predicate encodes the trading order exchange and settlement conditions such as exchange rates, time frames, etc., as well as requests for CLOB providing proofs of correct and fair order matching and tokens atomic swap/settlement conditions (trading parties A and B can swap their tokens if both have locked their tokens into escrow predicates). The settlement happens offchain and between the trading parties that follow SWAP protocol described above. Multiple parties execute settlements independently from each other and in parallel.
 
-![CLOB Agents](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/_page_18_Figure_0.jpeg)
-
 DEX is a set of agents executing the logic of AMM, but producing verifiable certificates proving their correct and fair execution. Each liquidity pair is being served by a separate agent, where tokens with the liquidity getting locked by an escrow predicate. That predicate encodes unlocking conditions such as fair exchange with the correct rate to a token with the opposite liquidity. In this manner, the AMM pair-liquidity agent maintains the pool of tokens storing the respective liquidity tokens and facilitates the tokens exchange with a trader party by applying swap protocol.
 
 **Lend/Borrow:** can be implemented as a version of DEX, where a token to be lent is being exchanged for the collateral token. Then, before the due time token carrying the equivalent borrowed value can be exchanged back to the collateral token. The agent facilitates execution of the lending protocol, but the escrow predicate encodes the lending conditions.
-
-**Staking / Yield Farming:** extension of the DEX protocol from above with escrow encoding staking and yield farming. Participants deposit their tokens with the relevant liquidity to the relevant DEX agent locked under the escrow predicate with the relevant staking conditions. Based on that, the farmers can periodically claim/unlock tokens carrying the respective rewards. The job of a DEX agent is to enable sharing and communication of the tokens and escrow predicate generation. It is up to the farmers to verify that all the escrow predicates generated by the DEX agent are correct and satisfy the farmers' interests.
 
 **Identity / Reputation**: similar to ENS, in Unicity we have so-called Unicity ID (nametag) tokens that are addressable self-authenticated data structures encoded within Unicity tokens and are mapping arbitrary names into app-specific values (like addresses, personal data, etc.). Unicity assures that once someone has claimed a specific name (minted the Unicity ID token), it will never be possible to claim the same name by someone else again. Unicity IDs are not public and are stored locally by the Unicity ID owner or any interested party. The reputation system may be implemented since the token can store app-specific data that can be modified (authorization as usual by means of the state predicate). In particular, we can store some reputation information certified by the respective reputation protocols.
 
@@ -315,16 +279,6 @@ DEX is a set of agents executing the logic of AMM, but producing verifiable cert
 **Oracles**: Implemented as a network of agents committing and certifying on some data (like, readings of real-world data, VRN generators, etc.)
 
 Where Agents are needed: anywhere where verifiable app logic needs to be executed and tokens state transitions should be triggered and tokens to be communicated to the interested parties. Agents facilitate multi-token protocols, like those based on SWAPs.
-
-## Does Unicity have transaction fees? How is the system sustained?
-
-The native currency provides democratic decentralized security through RandomX Proof of Work and platform utility enabling developer access to network services.
-
-The token design is still under construction but one approach we are considering is that developers will pay a subscription to access the Proof Aggregation Layer based on bands. I.e. up to a certain number of requests per month is free etc. The subscription model will be designed in a permissionless way i.e. a developer sends native currency tokens to a burn address and presents that proof to the infrastructure to access the service.
-
-The infrastructure operators (BFT nodes, SMT operators) will receive a percentage of block rewards to compensate them for their work.
-
-As the infrastructure is simply registering a hash value in a SMT the cost per transactions is fantastically low, less than \$0.00000001 per transaction
 
 ## How do I start a transaction with someone else?
 
@@ -348,7 +302,7 @@ The Proof Aggregation Layer merely records the existence of spending transaction
 
 The Consensus Layer validates the per-batch state transitions of the Aggregation Layer. Due to the system's cryptographic consistency and non-deletion proofs, there is no risk of illegitimate
 
-manipulation. Consequently, only a few machines per Aggregation Layer shard are required to provide sufficient security. The Consensus Layer's blockchain is minimal, containing only what is necessary for decentralization and tokenomics; it does not handle any user transaction-related data.
+manipulation. Consequently, only a few machines per Aggregation Layer shard are required to provide sufficient security. The Consensus Layer's blockchain is minimal; it does not handle any user transaction-related data.
 
 The consequence is that the transaction processing path is much shortened and there are far less validators performing redundant verification than traditional blockchains. See the Figures below.
 
@@ -356,63 +310,6 @@ The consequence is that the transaction processing path is much shortened and th
 
 ![Transaction flow in Unicity](https://raw.githubusercontent.com/unicity-sphere/agentic-chatbot/refs/heads/main/rag/pic/_page_21_Picture_4.jpeg)
 
-
-# Mining
-
-## How to start mining?
-
-Guide to set up mining in 5 minutes: https://github.com/unicitynetwork#how-to-start-mining-in-5-minutes
-
-## What mining pools are available?
-
-The latest list is available on GitHub here:
-- https://github.com/unicitynetwork/alpha-miner/blob/main/README.md#pool-mining-stratum
-
-## What mining tools are available?
-
-- Block explorer: https://www.unicity.network/
-- Mining software: alpha-miner or SRBMiner.
-
-## What wallets are available?
-
-- Web wallet: https://unicitynetwork.github.io/webwallet/
-- AgentSphere: https://sphere.unicity.network/
-
-## What are the tokenomics of this project?
-
-Please see tokenomics here:
-- https://unicity-tokenomics-bp6c0ne.gamma.site/
-
-## Is it 10BN total Supply or 21M total supply?
-
-The current chain (ALPHA) has BTC tokenomics i.e. 21M max supply. Unicity's native token, UCT, is integral to the network, is used via subscriptions, securing the network, and providing essential liquidity.
-UCT features an uncapped supply, commencing with an initial 10 billion tokens. At Mainnet launch, approximately 7% of tokens will be in circulation, with the remainder released on a proposed schedule to ensure network stability. This strategic apportionment supports our early contributors and is designed to foster a vibrant, active community, ensuring the ongoing health and growth of the Unicity ecosystem. More detailed tokenomics: https://unicity-tokenomics-bp6c0ne.gamma.site/
-
-## What is TGE, how will tokens be transferred? Will there be KYC?
-
-TGE means Token Generation Event, or the genesis event of mainnet. The alpha chain UTXOset will be encoded into the genesis block of the new chain. There will not be KYC.
-
-## Will there be mining after TGE?
-
-Yes. proposed initial Inflation of 5% or initially 500M tokens a year through Proof of Work.
-
-## What is one ALPHA equivalent to at TGE?
-
-476.19 UCT. The new chain will have an initial 10Bn supply. 20% of the chain tokens are allocated to “Network” which is the alpha chain. So 1% of the alpha chain is equal to 1% of the new chain. Or to convert the number of ALPHA into the new chain you need to multiply by 10BN/21M or 476.19.
-
-## What is the vesting schedule for tokens after TGE?
-
-Please see here: https://unicity-tokenomics-bp6c0ne.gamma.site/
-
-## If there are no user transactions at the Proof of Work layer how will it trade?
-
-The above diagram shows the architecture of Unicity. Coins are mined as normal at the Proof of Work Layer. When a User wants to transact they will send a transaction request to the PoW layer and the coin will be burnt and a new token, of equivalent value will be minted  at the agent layer, where it is free to move around the Internet. So think about it this way: you win a block reward, you then send a transaction to the consensus layer and a new token of equivalent value shows up in Hyperliquid for trading or in your mobile device for private spending, whatever you prefer.
-
-Agents are where the magic happens in Unicity. The PoW layer is there for tokenomics, security and providing a Bitcoin style “trust no one and verify” trust model at the Agent Layer.
-
-## When CEX?
-
-We are at the "finish the protocol and launch products" stage of development. Exchange conversations will come later once we have proven traction.
 
 ## What are the official links / socials?
 
@@ -422,4 +319,3 @@ We are at the "finish the protocol and launch products" stage of development. Ex
 - X: https://x.com/unicity_labs
 - Discord: https://discord.gg/PGzNZT5uVp
 - YouTube: https://www.youtube.com/@unicity-labs
-
