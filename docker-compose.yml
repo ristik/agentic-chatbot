@@ -158,14 +158,18 @@ services:
       SHUTDOWN_GRACE_MS: ${CHESS_BOT_SHUTDOWN_GRACE_MS:-60000}
       SHUTDOWN_PAYOUT_WAIT_MS: ${CHESS_BOT_SHUTDOWN_PAYOUT_WAIT_MS:-60000}
       # How often to reconcile open payment intents (CERTIFICATION_UNCONFIRMED /
-      # deferred delivery) via resumeOpenIntents(). Set 0 to disable.
+      # deferred delivery) via resumeNow(). Set 0 to disable.
       RESUME_INTERVAL_MS: ${CHESS_BOT_RESUME_INTERVAL_MS:-300000}
       GROUP_ID: ${CHESS_BOT_GROUP_ID:-chess}
       DATA_DIR: /app/data
+      # Payments-v2 journals (open send intents, delivery/mint journals). MUST
+      # be a real volume, NEVER tmpfs — see the durability note below.
+      JOURNAL_DIR: /app/journal
       TOKENS_DIR: /app/tokens
       NODE_OPTIONS: --max-old-space-size=512
     volumes:
       - ./data/chess-bot/tokens:/app/tokens
+      - ./data/chess-bot/journal:/app/journal
     # /app/data on tmpfs: the SDK's FileStorageProvider does a
     # writeFileSync + fsync + rename of the whole wallet.json on every
     # inbound event (cursor updates, etc.). On EBS, each round-trip is
@@ -181,6 +185,15 @@ services:
     # it has NO incoming mailbox (no delivery seen-set to lose). A wipe costs
     # only an automatic re-challenge sign-in plus a cheap inventory re-sync from
     # the server (the source of truth) — cheaper than losing the perf win above.
+    #
+    # DURABILITY CARVE-OUT: that "nothing to lose" argument covers INBOUND state
+    # only. OUTBOUND payments-v2 state — the open-intent backstop and delivery
+    # journal — also lived here, and losing it silently strands rewards: a send
+    # that returns CERTIFICATION_UNCONFIRMED is reported as sent (deliberately,
+    # so a retry can't double-pay) and is only finished later by resumeNow().
+    # With the journal wiped there was nothing left to resume. Those keys now
+    # route to JOURNAL_DIR (a real volume) via createSplitStorageProvider; the
+    # hot, re-syncable stream cursor stays here on tmpfs.
     tmpfs:
       - /app/data:size=64m
     # 1 min drain + 1 min payout wait + 30s of buffer for tear-down.

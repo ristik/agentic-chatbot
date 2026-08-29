@@ -97,7 +97,7 @@ export class BotWallet {
   async getBalanceUct(): Promise<number> {
     const coinId = await this.getCoinId();
     const decimals = await this.getDecimals();
-    const assets = this.sphere.payments.getBalance(coinId) as AssetSummary[];
+    const assets = (await this.sphere.payments.assets(coinId)) as AssetSummary[];
     const asset = assets.find((a) => a.coinId === coinId);
     if (!asset) return 0;
     return Number(BigInt(asset.confirmedAmount) / 10n ** BigInt(decimals));
@@ -134,7 +134,7 @@ export class BotWallet {
     );
 
     try {
-      const result = await this.sphere.payments.mintFungibleToken(coinId, amount);
+      const result = await this.sphere.payments.mint(coinId, amount);
       if (!result.success) {
         console.error(`${this.tag} self-mint failed: ${result.error}`);
         return false;
@@ -167,13 +167,24 @@ export class BotWallet {
     const coinId = await this.getCoinId();
     const smallest = await this.toSmallest(amountUct);
 
-    const balance = await this.getBalanceUct();
-    if (balance < amountUct) {
-      // Try a top-up before giving up.
-      console.log(
-        `${this.tag} balance ${balance} < reward ${amountUct}, attempting top-up before send`,
+    // Best-effort pre-flight top-up. Under sphere-sdk >= 0.15 the balance read
+    // is `payments.assets()` — async and network-backed, where the old
+    // `payments.getBalance()` was a synchronous local read that could not fail.
+    // A blip here must NOT abort the payout: send() enforces funds itself and
+    // reports INSUFFICIENT_BALANCE, and throwing out of sendReward() would skip
+    // the caller's paidGameIds rollback and strand the reward forever.
+    try {
+      const balance = await this.getBalanceUct();
+      if (balance < amountUct) {
+        console.log(
+          `${this.tag} balance ${balance} < reward ${amountUct}, attempting top-up before send`,
+        );
+        await this.ensureBalance();
+      }
+    } catch (err) {
+      console.warn(
+        `${this.tag} pre-send balance check failed (${err instanceof Error ? err.message : String(err)}) — attempting send anyway`,
       );
-      await this.ensureBalance();
     }
 
     try {

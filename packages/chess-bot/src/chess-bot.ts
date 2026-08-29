@@ -3,6 +3,7 @@ import path from 'path';
 import WebSocket from 'ws';
 import { Sphere, STORAGE_KEYS_GLOBAL } from '@unicitylabs/sphere-sdk';
 import { createNodeProviders, createFileStorageProvider } from '@unicitylabs/sphere-sdk/impl/nodejs';
+import { createSplitStorageProvider } from './split-storage.js';
 import { createWalletApiProviders } from '@unicitylabs/sphere-sdk/impl/shared/wallet-api';
 import {
   parseMessage,
@@ -212,8 +213,17 @@ export class ChessBot {
     const base = createNodeProviders({
       network,
       dataDir: this.config.dataDir,
-      tokensDir: this.config.tokensDir,
       oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
+    });
+
+    // DATA_DIR is tmpfs (see docker-compose) for the write-amplification win,
+    // but that also discarded the payments-v2 intent backstop and delivery
+    // journal on every restart — silently stranding any reward that was left
+    // mid-flight. Route just those money-critical keys to a real disk.
+    base.storage = createSplitStorageProvider({
+      fastDir: this.config.dataDir,
+      durableDir: this.config.journalDir,
+      network,
     });
 
     // Wrap with the FULL wallet-api preset: this bot moves money (reward
@@ -573,11 +583,22 @@ export class ChessBot {
       `${this.tag} Bot lost game ${info.gameId} (elo ${elo}) — paying ${reward} ${this.config.coinSymbol} to ${recipient}`,
     );
 
-    const result = await this.wallet.sendReward(
-      recipient,
-      reward,
-      `unichess reward ${info.gameId}`,
-    );
+    // paidGameIds was marked BEFORE the send (so a concurrent game-end can't
+    // double-pay). Every failure exit must therefore un-mark it, including an
+    // unexpected throw — sendReward() is contracted to return {ok:false} rather
+    // than reject, but if it ever does reject, swallowing it here without the
+    // rollback would leave the game marked paid forever and silently strand the
+    // opponent's reward.
+    let result: { ok: boolean; error?: string };
+    try {
+      result = await this.wallet.sendReward(
+        recipient,
+        reward,
+        `unichess reward ${info.gameId}`,
+      );
+    } catch (err) {
+      result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
     if (!result.ok) {
       console.error(
         `${this.tag} Failed to pay reward for ${info.gameId}: ${result.error ?? 'unknown error'}`,
@@ -607,14 +628,9 @@ export class ChessBot {
     if (this.shuttingDown || this.resumeInFlight || !sphere) return;
     this.resumeInFlight = true;
     try {
-      const { resumed, conflicted, failed } = await sphere.payments.resumeOpenIntents();
-      if (resumed.length || conflicted.length || failed.length) {
-        console.log(
-          `${this.tag} resumeOpenIntents: ${resumed.length} resumed, ${conflicted.length} conflicted, ${failed.length} failed`,
-        );
-      }
+      await sphere.payments.resumeNow();
     } catch (err) {
-      console.error(`${this.tag} resumeOpenIntents tick failed:`, err);
+      console.error(`${this.tag} resumeNow tick failed:`, err);
     } finally {
       this.resumeInFlight = false;
     }
@@ -742,6 +758,17 @@ export class ChessBot {
         console.warn(
           `${this.tag} ${this.pendingShutdownTasks.size} post-game task(s) still pending after payout wait — exiting anyway`,
         );
+      }
+    }
+
+    // Phase 4: flush any intent still open (a send that returned
+    // CERTIFICATION_UNCONFIRMED completes here) while storage is still alive.
+    // Without this the intent waits for the NEXT process to resume it.
+    if (this.sphere) {
+      try {
+        await this.sphere.payments.resumeNow();
+      } catch (err) {
+        console.error(`${this.tag} final resumeNow() before teardown failed:`, err);
       }
     }
 
