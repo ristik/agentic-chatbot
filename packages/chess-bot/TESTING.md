@@ -1,8 +1,8 @@
 # Testing chess-bot before deploying
 
 chess-bot is the only bot that moves money, so a bad deploy costs real payouts.
-Three levels, cheapest first. Run 1 and 2 on every change; run 3 before any
-change that touches the payout or storage path.
+Four levels, cheapest first. Run 1 on every change and 2 before any deploy;
+3 and 4 are manual drills for changes touching the payout or storage path.
 
 ## 1. Automated (no credentials, no network)
 
@@ -29,7 +29,30 @@ asserts nothing. To check, revert a fix and confirm failures — e.g. make
 the unguarded `await this.getBalanceUct()` in `sendReward()` (2 of 3 wallet
 tests should fail).
 
-## 2. Local run against testnet2
+## 2. Live payout check (one command)
+
+```bash
+AGGREGATOR_KEY=... pnpm --filter @agentic/chess-bot test:e2e
+```
+
+`scripts/payout-e2e.ts` creates two throwaway wallets, funds the first by
+self-mint, then calls `sendReward()` — the exact call `handleGameEnd()` makes
+on a loss — and polls the recipient's confirmed balance. It exits non-zero
+unless the balance actually rises by the reward amount. `sendReward()`
+returning `ok` is deliberately *not* treated as a pass: it reports ok for a
+send left pending confirmation.
+
+This covers both money paths the 0.15 migration touched (`payments.mint()` and
+`payments.send()`) without needing a chess game or a second person. It is kept
+out of `npm test` because it needs network, a key, and mints real tokens.
+
+Note: a freshly minted token is not confirmed immediately, so the script waits
+for the balance to settle. `ensureBalance()` reads the balance the instant
+`mint()` resolves and will report 0 on a brand-new wallet — harmless in the bot
+(startup logs it and continues; `sendReward` lets `send()` enforce funds), but
+it means "self-mint returned" is not the same as "funds are spendable".
+
+## 3. Local run against testnet2
 
 Runs the real bot on the real network under a throwaway identity, so nothing
 touches the production nametag or wallet.
@@ -82,12 +105,12 @@ Then confirm the UCT actually arrived in your wallet. The log line alone is not
 proof — `sendReward()` deliberately reports `ok` for a send left pending
 confirmation.
 
-## 3. The restart test (the bug that stranded a reward)
+## 4. The restart test (the bug that stranded a reward)
 
 This is the scenario that automated tests can only simulate. Do it before any
 deploy that touches storage.
 
-1. Start the bot as in step 2 and beat it.
+1. Start the bot as in step 3 and beat it.
 2. The moment you see `Bot lost game ... — paying`, kill it hard:
    `pkill -9 -f chess-bot`. `-9` matters — it skips the graceful drain and
    leaves the intent open, which is exactly the production restart case.
@@ -116,4 +139,4 @@ reward never arrives and nothing logs an error.
   ones.
 - Check `stop_grace_period` (150s) still exceeds
   `SHUTDOWN_GRACE_MS` + `SHUTDOWN_PAYOUT_WAIT_MS`, or Docker will SIGKILL the
-  bot mid-drain and re-open the very window step 3 tests.
+  bot mid-drain and re-open the very window step 4 tests.

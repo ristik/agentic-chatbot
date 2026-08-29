@@ -1,0 +1,12 @@
+{
+  // Typechecks the e2e script, which the main build deliberately excludes
+  // (tsconfig.json is scoped to src/ so `tsc` only emits the shipped bot).
+  // test/ is left out: those files run under tsx, which does not typecheck,
+  // and several predate this config with unrelated type errors.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "scripts/**/*"]
+}
