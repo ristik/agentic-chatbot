@@ -137,6 +137,10 @@ reward never arrives and nothing logs an error.
 - The journal starts empty. Any intent already open on the running bot is
   unrecoverable — this change prevents the next loss, it does not recover past
   ones.
+- chess-bot is no longer stateless on the host. `scripts/bot-backup.sh` now
+  includes `journal/`, so host migration and restore preserve pending payouts;
+  a backup taken without it warns. Any other backup or volume-snapshot
+  automation must cover `./data/chess-bot/journal` too.
 - Check `stop_grace_period` (150s) still exceeds
   `SHUTDOWN_GRACE_MS` + `SHUTDOWN_PAYOUT_WAIT_MS`, or Docker will SIGKILL the
   bot mid-drain and re-open the very window step 4 tests.
