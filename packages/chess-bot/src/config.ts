@@ -8,7 +8,6 @@ export interface ChessBotConfig {
   /** Directory for wallet persistence */
   dataDir: string;
   /** Directory for token state */
-  tokensDir: string;
   /** Max number of simultaneous games */
   maxConcurrentGames: number;
   /** Group chat ID for posting game results (optional) */
@@ -49,7 +48,6 @@ export function loadConfig(): ChessBotConfig {
     mnemonic: process.env.BOT_MNEMONIC || undefined,
     network: process.env.NETWORK || 'testnet2',
     dataDir: process.env.DATA_DIR || './data/chess-bot/data',
-    tokensDir: process.env.TOKENS_DIR || './data/chess-bot/tokens',
     maxConcurrentGames: parseInt(process.env.MAX_CONCURRENT_GAMES || '25', 10),
     groupId: process.env.GROUP_ID || undefined,
     targetBalance: parseInt(process.env.TARGET_BALANCE || '1000', 10),

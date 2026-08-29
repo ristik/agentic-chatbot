@@ -3,7 +3,6 @@ export interface L3Config {
   nametag: string;
   mnemonic?: string;
   dataDir: string;
-  tokensDir: string;
   aggregatorUrl: string;
   explorerBaseUrl: string;
   groupId: string | undefined;
@@ -25,7 +24,6 @@ export function loadConfig(): L3Config {
     nametag: process.env.BOT_NAMETAG || 'unicity-l3',
     mnemonic: process.env.BOT_MNEMONIC || undefined,
     dataDir: process.env.DATA_DIR || '/app/data',
-    tokensDir: process.env.TOKENS_DIR || '/app/tokens',
     // testnet2 block-info aggregator for the raw block-polling client (NOT the
     // SDK oracle). NOTE: testnet2 is a fresh chain — block heights reset and
     // this host must serve /config/shards + JSON-RPC get_block_height/get_block.

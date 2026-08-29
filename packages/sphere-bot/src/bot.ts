@@ -41,7 +41,6 @@ export class SphereBot {
     const providers = createNodeProviders({
       network: this.config.network,
       dataDir: this.config.dataDir,
-      tokensDir: this.config.tokensDir,
       oracle: {
         apiKey: process.env.AGGREGATOR_KEY || undefined,
         ...(this.config.oracle?.trustBasePath

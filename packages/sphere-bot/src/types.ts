@@ -6,7 +6,6 @@ export interface SphereBotConfig {
   /** Sphere wallet data directory */
   dataDir: string;
   /** Sphere token storage directory */
-  tokensDir: string;
   /** Bot's Sphere @nametag */
   nametag: string;
   /** BIP39 mnemonic for wallet recovery. If provided, used to restore the wallet identity. */

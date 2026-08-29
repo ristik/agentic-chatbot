@@ -25,7 +25,6 @@ export function loadConfig(): SphereBotConfig {
     name: 'kbbot',
     network: (process.env.NETWORK || 'testnet2') as SphereBotConfig['network'],
     dataDir: process.env.DATA_DIR || '/app/data',
-    tokensDir: process.env.TOKENS_DIR || '/app/tokens',
     nametag: process.env.BOT_NAMETAG || 'kbbot',
     mnemonic: process.env.BOT_MNEMONIC || undefined,
     systemPrompt: SYSTEM_PROMPT,

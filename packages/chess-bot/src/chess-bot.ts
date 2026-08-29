@@ -212,7 +212,6 @@ export class ChessBot {
     const base = createNodeProviders({
       network,
       dataDir: this.config.dataDir,
-      tokensDir: this.config.tokensDir,
       oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
     });
 
@@ -607,14 +606,9 @@ export class ChessBot {
     if (this.shuttingDown || this.resumeInFlight || !sphere) return;
     this.resumeInFlight = true;
     try {
-      const { resumed, conflicted, failed } = await sphere.payments.resumeOpenIntents();
-      if (resumed.length || conflicted.length || failed.length) {
-        console.log(
-          `${this.tag} resumeOpenIntents: ${resumed.length} resumed, ${conflicted.length} conflicted, ${failed.length} failed`,
-        );
-      }
+      await sphere.payments.resumeNow();
     } catch (err) {
-      console.error(`${this.tag} resumeOpenIntents tick failed:`, err);
+      console.error(`${this.tag} resumeNow tick failed:`, err);
     } finally {
       this.resumeInFlight = false;
     }

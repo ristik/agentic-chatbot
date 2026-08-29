@@ -97,7 +97,7 @@ export class BotWallet {
   async getBalanceUct(): Promise<number> {
     const coinId = await this.getCoinId();
     const decimals = await this.getDecimals();
-    const assets = this.sphere.payments.getBalance(coinId) as AssetSummary[];
+    const assets = (await this.sphere.payments.assets(coinId)) as AssetSummary[];
     const asset = assets.find((a) => a.coinId === coinId);
     if (!asset) return 0;
     return Number(BigInt(asset.confirmedAmount) / 10n ** BigInt(decimals));
@@ -134,7 +134,7 @@ export class BotWallet {
     );
 
     try {
-      const result = await this.sphere.payments.mintFungibleToken(coinId, amount);
+      const result = await this.sphere.payments.mint(coinId, amount);
       if (!result.success) {
         console.error(`${this.tag} self-mint failed: ${result.error}`);
         return false;

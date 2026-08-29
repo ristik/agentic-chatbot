@@ -14,7 +14,6 @@ async function initSphere() {
   // aggregator apiKey must be injected. No wallet-api wrapper — it moves no money.
   const providers = createNodeProviders({
     dataDir: config.dataDir,
-    tokensDir: config.tokensDir,
     network: config.network,
     oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
   });
