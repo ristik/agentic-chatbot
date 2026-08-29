@@ -3,6 +3,7 @@ import path from 'path';
 import WebSocket from 'ws';
 import { Sphere, STORAGE_KEYS_GLOBAL } from '@unicitylabs/sphere-sdk';
 import { createNodeProviders, createFileStorageProvider } from '@unicitylabs/sphere-sdk/impl/nodejs';
+import { createSplitStorageProvider } from './split-storage.js';
 import { createWalletApiProviders } from '@unicitylabs/sphere-sdk/impl/shared/wallet-api';
 import {
   parseMessage,
@@ -213,6 +214,16 @@ export class ChessBot {
       network,
       dataDir: this.config.dataDir,
       oracle: { apiKey: process.env.AGGREGATOR_KEY || undefined },
+    });
+
+    // DATA_DIR is tmpfs (see docker-compose) for the write-amplification win,
+    // but that also discarded the payments-v2 intent backstop and delivery
+    // journal on every restart — silently stranding any reward that was left
+    // mid-flight. Route just those money-critical keys to a real disk.
+    base.storage = createSplitStorageProvider({
+      fastDir: this.config.dataDir,
+      durableDir: this.config.journalDir,
+      network,
     });
 
     // Wrap with the FULL wallet-api preset: this bot moves money (reward
@@ -747,6 +758,17 @@ export class ChessBot {
         console.warn(
           `${this.tag} ${this.pendingShutdownTasks.size} post-game task(s) still pending after payout wait — exiting anyway`,
         );
+      }
+    }
+
+    // Phase 4: flush any intent still open (a send that returned
+    // CERTIFICATION_UNCONFIRMED completes here) while storage is still alive.
+    // Without this the intent waits for the NEXT process to resume it.
+    if (this.sphere) {
+      try {
+        await this.sphere.payments.resumeNow();
+      } catch (err) {
+        console.error(`${this.tag} final resumeNow() before teardown failed:`, err);
       }
     }
 
