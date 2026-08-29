@@ -572,11 +572,22 @@ export class ChessBot {
       `${this.tag} Bot lost game ${info.gameId} (elo ${elo}) — paying ${reward} ${this.config.coinSymbol} to ${recipient}`,
     );
 
-    const result = await this.wallet.sendReward(
-      recipient,
-      reward,
-      `unichess reward ${info.gameId}`,
-    );
+    // paidGameIds was marked BEFORE the send (so a concurrent game-end can't
+    // double-pay). Every failure exit must therefore un-mark it, including an
+    // unexpected throw — sendReward() is contracted to return {ok:false} rather
+    // than reject, but if it ever does reject, swallowing it here without the
+    // rollback would leave the game marked paid forever and silently strand the
+    // opponent's reward.
+    let result: { ok: boolean; error?: string };
+    try {
+      result = await this.wallet.sendReward(
+        recipient,
+        reward,
+        `unichess reward ${info.gameId}`,
+      );
+    } catch (err) {
+      result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
     if (!result.ok) {
       console.error(
         `${this.tag} Failed to pay reward for ${info.gameId}: ${result.error ?? 'unknown error'}`,
